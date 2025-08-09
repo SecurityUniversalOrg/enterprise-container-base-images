@@ -1,0 +1,194 @@
+name: Cascade Rebuilds
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'images/**'
+      - 'dependency-graph.yaml'
+      - 'matrix.yaml'
+  schedule:
+    - cron: "0 6 1 * *"   # monthly, 06:00 UTC on the 1st
+  workflow_dispatch:
+    inputs:
+      roots:
+        description: "Comma-separated root image names to start cascade from (optional)"
+        required: false
+        type: string
+      full_rebuild:
+        description: "Rebuild ALL images (ignore roots)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      subset: ${{ steps.compute.outputs.subset }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute cascade subset
+        id: compute
+        run: |
+          python3 - <<'PY'
+import os, yaml, json, subprocess
+# Load dependency graph and matrix
+dep = yaml.safe_load(open('dependency-graph.yaml'))
+mat = yaml.safe_load(open('matrix.yaml'))
+all_names = set(i['name'] for i in mat.get('images', []))
+
+def changed_roots_from_git():
+    # Look at the last commit diff on push; fallback to empty on schedule
+    try:
+        out = subprocess.check_output(["git","diff","--name-only","HEAD~1..HEAD"], text=True)
+    except Exception:
+        return set()
+    roots=set()
+    for line in out.splitlines():
+        parts=line.strip().split('/')
+        # expects images/<category>/<name>/<version>/Dockerfile or similar
+        if parts and parts[0]=="images":
+            # Map path to matrix.name; we rely on matrix names rather than paths here.
+            # Simplest heuristic: take top-level name folder under category
+            # e.g., images/base/ubuntu/24.04 -> 'base-ubuntu'
+            if len(parts)>=3:
+                cat=parts[1]; name=parts[2]
+                candidate=f"{cat}-{name}".replace('_','-')
+                if candidate in all_names:
+                    roots.add(candidate)
+    return roots
+
+def walk(roots, dep):
+    seen=set()
+    stack=list(roots)
+    while stack:
+        n=stack.pop()
+        if n in seen: continue
+        seen.add(n)
+        for c in dep.get(n,[]) or []:
+            stack.append(c)
+    return seen
+
+# Inputs
+roots_in = os.getenv('INPUT_ROOTS','').strip()
+full = (os.getenv('INPUT_FULL_REBUILD','false').lower() == 'true')
+schedule_event = os.getenv('GITHUB_EVENT_NAME') == 'schedule'
+
+subset=set()
+
+if full or schedule_event:
+    subset = all_names
+else:
+    if roots_in:
+        roots = set(x.strip() for x in roots_in.split(',') if x.strip())
+    else:
+        roots = changed_roots_from_git()
+
+    if roots:
+        subset = walk(roots, dep)
+    else:
+        subset = set()
+
+subset = [n for n in mat['images'] if n['name'] in subset]
+print(json.dumps(subset))
+open(os.environ['GITHUB_OUTPUT'],'a').write("subset="+json.dumps([x['name'] for x in subset])+"\n")
+PY
+
+  rebuild_here:
+    needs: plan
+    if: needs.plan.outputs.subset != '[]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch local build (subset)
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.SELF_DISPATCH_TOKEN }}
+          workflow: Build • Scan • Sign • Publish
+          ref: main
+          inputs: |
+            subset=${{ join(fromJson(needs.plan.outputs.subset), ',') }}
+
+  notify_downstream:
+    needs: plan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load downstream map (optional)
+        id: map
+        run: |
+          if [ -f ".downstreams.yaml" ]; then
+            echo "present=true" >> $GITHUB_OUTPUT
+          else
+            echo "present=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Emit repository_dispatch to downstreams
+        if: steps.map.outputs.present == 'true' && needs.plan.outputs.subset != '[]'
+        uses: actions/github-script@v7
+        env:
+          TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          SUBSET: ${{ needs.plan.outputs.subset }}
+        with:
+          script: |
+            const fs = require('fs');
+            const yaml = require('js-yaml');
+
+            const subset = JSON.parse(process.env.SUBSET);
+            const doc = yaml.load(fs.readFileSync('.downstreams.yaml','utf8')) || {};
+            // .downstreams.yaml example:
+            // runners:
+            //   repo: "your-enterprise-org/platform-arc-runner-images"
+            //   mapping:
+            //     base-ubuntu: ["iac-aws","iac-azure","iac-gcp","container-build-aws","container-build-azure","container-build-gcp","k8s-deploy-aws","k8s-deploy-azure","k8s-deploy-gcp","sec-scan"]
+            //     lang-java-jdk: ["lang-java"]
+            //     lang-python: ["lang-python"]
+            //     lang-node: ["lang-node"]
+            //     lang-dotnet-sdk: ["lang-dotnet"]
+            //     lang-go: ["lang-go"]
+
+            const targets = [];
+            if (doc.runners && doc.runners.repo && doc.runners.mapping) {
+              let agg = new Set();
+              for (const base of subset) {
+                const mapped = doc.runners.mapping[base];
+                if (Array.isArray(mapped)) for (const m of mapped) agg.add(m);
+              }
+              if (agg.size > 0) {
+                targets.push({
+                  repo: doc.runners.repo,
+                  subset: Array.from(agg)
+                });
+              }
+            }
+
+            if (targets.length === 0) {
+              core.info("No downstream targets resolved. Skipping.");
+              return;
+            }
+
+            const token = process.env.TOKEN;
+            if (!token) {
+              core.setFailed("REPO_DISPATCH_TOKEN not configured.");
+              return;
+            }
+
+            const octokit = github.getOctokit(token);
+            for (const t of targets) {
+              core.info(`Dispatching to ${t.repo} with subset ${t.subset.join(",")}`);
+              await octokit.rest.repos.createDispatchEvent({
+                owner: t.repo.split('/')[0],
+                repo: t.repo.split('/')[1],
+                event_type: "base-images-updated",
+                client_payload: {
+                  date_tag: "2025.08",
+                  dockerhub_namespace: "${{ github.repository_owner }}",
+                  subset: t.subset.join(',')
+                }
+              });
+            }
