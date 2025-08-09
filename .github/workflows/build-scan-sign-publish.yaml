@@ -54,14 +54,7 @@ jobs:
           if [ -n "${{ inputs.repo }}" ]; then
             echo "repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
           else
-            python3 - <<'PY'
-            import yaml, os
-            m = yaml.safe_load(open('matrix.yaml'))
-            ns = m.get('dockerhub_namespace')
-            owner = os.environ.get('GITHUB_REPOSITORY_OWNER','')
-            repo = f"docker.io/{ns}" if ns else f"docker.io/{owner}"
-            open(os.environ['GITHUB_OUTPUT'],'a').write(f"repo={repo}\n")
-            PY
+            python3 -c 'import yaml,os,sys; m=yaml.safe_load(open("matrix.yaml")); ns=m.get("dockerhub_namespace"); owner=os.environ.get("GITHUB_REPOSITORY_OWNER",""); repo=f"docker.io/{ns}" if ns else f"docker.io/{owner}"; print(f"repo={repo}")' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build matrix (optionally filter by subset)
