@@ -1,3 +1,4 @@
+---
 name: Build-Scan-Sign-Publish
 
 on:
@@ -13,12 +14,16 @@ on:
   workflow_dispatch:
     inputs:
       subset:
-        description: "Comma-separated image names to build (optional; must match names in matrix.yaml)"
+        description: >
+          Comma-separated image names to build (optional; must match names
+          in matrix.yaml)
         required: false
         type: string
         default: ""
       repo:
-        description: "Target registry repo prefix, e.g. docker.io/kaiserbros (leave blank to auto-resolve)"
+        description: >
+          Target registry repo prefix, e.g. docker.io/kaiserbros
+          (leave blank to auto-resolve)
         required: false
         type: string
         default: ""
@@ -49,42 +54,41 @@ jobs:
           if [ -n "${{ inputs.repo }}" ]; then
             echo "repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
           else
-            python3 - "$GITHUB_OUTPUT" <<'PY'
-import yaml, os
-m = yaml.safe_load(open('matrix.yaml'))
-ns = m.get('dockerhub_namespace')
-owner = os.environ.get('GITHUB_REPOSITORY_OWNER','')
-repo = f"docker.io/{ns}" if ns else f"docker.io/{owner}"
-open(os.environ['GITHUB_OUTPUT'],'a').write(f"repo={repo}\n")
-PY
+            python3 - <<'PY'
+            import yaml, os
+            m = yaml.safe_load(open('matrix.yaml'))
+            ns = m.get('dockerhub_namespace')
+            owner = os.environ.get('GITHUB_REPOSITORY_OWNER','')
+            repo = f"docker.io/{ns}" if ns else f"docker.io/{owner}"
+            open(os.environ['GITHUB_OUTPUT'],'a').write(f"repo={repo}\n")
+            PY
           fi
 
       - name: Build matrix (optionally filter by subset)
         id: matrix
         shell: bash
-        run: |
-          set -euo pipefail
-          python3 - "$GITHUB_OUTPUT" <<'PY'
-import os, json, yaml, sys
-out = sys.argv[1]
-m = yaml.safe_load(open('matrix.yaml'))
-subset = os.getenv('SUBSET','').strip()
-images = m.get('images', [])
-if subset:
-  wanted = {x.strip() for x in subset.split(',') if x.strip()}
-  images = [i for i in images if i.get('name') in wanted]
-open(out,'a').write("matrix="+json.dumps(images)+"\n")
-PY
         env:
           SUBSET: ${{ inputs.subset }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, json, yaml
+          m = yaml.safe_load(open('matrix.yaml'))
+          subset = os.getenv('SUBSET','').strip()
+          images = m.get('images', [])
+          if subset:
+            wanted = {x.strip() for x in subset.split(',') if x.strip()}
+            images = [i for i in images if i.get('name') in wanted]
+          open(os.environ['GITHUB_OUTPUT'],'a').write("matrix="+json.dumps(images)+"\n")
+          PY
 
   build:
     needs: prepare
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include: ${{ fromJson(needs.prepare.outputs.matrix) }}
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -116,14 +120,16 @@ PY
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b /usr/local/bin
 
       - name: Generate SBOM
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p sbom
-          syft "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}" -o spdx-json > "sbom/${{ matrix.name }}.spdx.json"
+          syft "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}" \
+            -o spdx-json > "sbom/${{ matrix.name }}.spdx.json"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -134,7 +140,8 @@ PY
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b /usr/local/bin
 
       - name: CVE gate
         shell: bash
@@ -148,7 +155,8 @@ PY
         run: |
           set -euo pipefail
           COSIGN_VERSION="v2.2.4"
-          curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" -o cosign
+          curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" \
+            -o cosign
           chmod +x cosign && sudo mv cosign /usr/local/bin/
 
       - name: Sign container
