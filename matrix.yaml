@@ -1,5 +1,5 @@
 date_tag: '2025.08'
-dockerhub_namespace: kaiserbros
+dockerhub_namespace: securityuniversal
 images:
 - name: base-ubuntu
   path: images/base/ubuntu/24.04
