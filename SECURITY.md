@@ -1,0 +1,1 @@
+HIGH/CRITICAL CVEs block release; images are signed and SBOMs are published.

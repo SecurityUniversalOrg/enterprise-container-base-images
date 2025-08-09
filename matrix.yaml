@@ -1,0 +1,48 @@
+date_tag: '2025.08'
+dockerhub_namespace: kaiserbros
+images:
+- name: base-ubuntu
+  path: images/base/ubuntu/24.04
+  tags:
+  - 24.04-2025.08
+  - 24.04-latest
+- name: base-ubuntu-slim
+  path: images/base/ubuntu/24.04-slim
+  tags:
+  - 24.04-slim-2025.08
+  - 24.04-slim-latest
+- name: base-ubi9-fips
+  path: images/base/ubi9/fips
+  tags:
+  - ubi9-fips-2025.08
+  - ubi9-fips-latest
+- name: web-apache
+  path: images/web/apache/2.4
+  tags:
+  - apache-2.4-2025.08
+  - apache-2.4-latest
+- name: web-flask
+  path: images/web/flask/py3.12
+  tags:
+  - flask-py3.12-2025.08
+  - flask-py3.12-latest
+- name: lang-python
+  path: images/lang/python/3.12-base
+  tags:
+  - py3.12-base-2025.08
+  - py3.12-base-latest
+- name: lang-java
+  path: images/lang/java/21-jre
+  tags:
+  - java21-jre-2025.08
+  - java21-jre-latest
+- name: lang-node
+  path: images/lang/node/20-runtime
+  tags:
+  - node20-runtime-2025.08
+  - node20-runtime-latest
+- name: lang-dotnet
+  path: images/lang/dotnet/8-aspnet
+  tags:
+  - dotnet8-aspnet-2025.08
+  - dotnet8-aspnet-latest
