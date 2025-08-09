@@ -4,23 +4,24 @@ on:
   push:
     branches: [main]
     paths:
-      - 'images/**'
-      - 'matrix.yaml'
+      - images/**
+      - matrix.yaml
   pull_request:
     paths:
-      - 'images/**'
-      - 'matrix.yaml'
+      - images/**
+      - matrix.yaml
   workflow_dispatch:
     inputs:
       subset:
         description: "Comma-separated image names to build (optional; must match names in matrix.yaml)"
         required: false
         type: string
+        default: ""
       repo:
-        description: "Target registry repo prefix (default docker.io/<ns>)"
+        description: "Target registry repo prefix, e.g. docker.io/kaiserbros (leave blank to auto-resolve)"
         required: false
         type: string
-        default: "docker.io/${{ github.repository_owner }}"
+        default: ""
 
 permissions:
   contents: read
@@ -28,10 +29,8 @@ permissions:
   packages: read
 
 env:
-  # Build knobs
   DOCKERHUB_REGISTRY: docker.io
-  # Cosign
-  COSIGN_YES: "true"   # non-interactive confirmations
+  COSIGN_YES: "true"
 
 jobs:
   prepare:
@@ -45,26 +44,26 @@ jobs:
       - name: Resolve repo prefix
         id: repo
         run: |
-          if [ -n "${{ inputs.repo }}" ]; then
-            echo "repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          INPUT_REPO="${{ inputs.repo }}"
+          if [ -n "$INPUT_REPO" ]; then
+            echo "repo=$INPUT_REPO" >> "$GITHUB_OUTPUT"
           else
-            # fallback to dockerhub + org/namespace from matrix.yaml
-            ns=$(python3 - <<'PY'
-import yaml
-m=yaml.safe_load(open('matrix.yaml'))
-print(m.get('dockerhub_namespace',''))
+            # Try dockerhub_namespace from matrix.yaml; else default to docker.io/<owner>
+            python3 - <<'PY'
+import yaml, os
+m = yaml.safe_load(open('matrix.yaml'))
+ns = m.get('dockerhub_namespace')
+owner = os.environ.get('GITHUB_REPOSITORY_OWNER', '')
+repo = f"docker.io/{ns}" if ns else f"docker.io/{owner}"
+open(os.environ['GITHUB_OUTPUT'],'a').write(f"repo={repo}\n")
 PY
-)
-            if [ -n "$ns" ]; then
-              echo "repo=docker.io/$ns" >> "$GITHUB_OUTPUT"
-            else
-              echo "repo=docker.io/${{ github.repository_owner }}" >> "$GITHUB_OUTPUT"
-            fi
           fi
 
       - name: Build matrix (optionally filter by subset)
         id: out
         run: |
+          set -euo pipefail
           python3 - <<'PY'
 import os, json, yaml
 m = yaml.safe_load(open('matrix.yaml'))
@@ -73,11 +72,10 @@ images = m.get('images', [])
 if subset:
   want = set(x.strip() for x in subset.split(',') if x.strip())
   images = [i for i in images if i['name'] in want]
-print(f"matrix={json.dumps(images)}")
 open(os.environ['GITHUB_OUTPUT'],'a').write("matrix="+json.dumps(images)+"\n")
 PY
         env:
-          SUBSET: ${{ inputs.subset || '' }}
+          SUBSET: ${{ inputs.subset }}
 
   build:
     needs: prepare
@@ -116,10 +114,12 @@ PY
 
       - name: Install Syft (SBOM)
         run: |
+          set -euo pipefail
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Generate SBOM (spdx-json)
         run: |
+          set -euo pipefail
           mkdir -p sbom
           syft ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }} -o spdx-json > sbom/${{ matrix.name }}.spdx.json
       - uses: actions/upload-artifact@v4
@@ -129,14 +129,18 @@ PY
 
       - name: Install Trivy
         run: |
+          set -euo pipefail
           curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
       - name: CVE gate (Trivy HIGH/CRITICAL)
         run: |
-          trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}
+          set -euo pipefail
+          trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed \
+            ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}
 
       - name: Install cosign
         run: |
+          set -euo pipefail
           COSIGN_VERSION="v2.2.4"
           curl -sSfL https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64 -o cosign
           chmod +x cosign && sudo mv cosign /usr/local/bin/
@@ -145,12 +149,11 @@ PY
         env:
           COSIGN_EXPERIMENTAL: "true"
         run: |
+          set -euo pipefail
           cosign sign ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}
 
-  # Optional summary
   summarize:
     needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
-      - name: Done
-        run: echo "Builds complete."
+      - run: echo "Builds complete."
