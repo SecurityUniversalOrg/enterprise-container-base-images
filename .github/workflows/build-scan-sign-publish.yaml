@@ -103,7 +103,7 @@ jobs:
             --build-arg DATE_TAG=${{ matrix.date_tag }} \
             --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }} \
             --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }} \
-            --output=type=oci,dest=./oci-layout \
+            --output=type=oci,tar=false,dest=./oci-layout \
             --file ${{ matrix.path }}/Dockerfile \
             .
           test -f ./oci-layout/index.json && echo "OK: OCI dir ready"
