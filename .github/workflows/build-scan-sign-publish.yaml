@@ -101,6 +101,7 @@ jobs:
             --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }} \
             --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }} \
             --load \
+            --file ${{ matrix.path }}/Dockerfile \
             .
 
       - name: Generate SBOM (SPDX JSON)
