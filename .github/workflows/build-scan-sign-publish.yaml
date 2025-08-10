@@ -104,7 +104,7 @@ jobs:
             --output=type=oci,dest=./oci-layout \
             --file ${{ matrix.path }}/Dockerfile \
             .
-          ls -al ./oci-layout  # debug: should contain index.json
+          ls -al ./oci-layout/  # debug: should contain index.json
 
     #   - name: Install Trivy
     #     shell: bash
@@ -117,9 +117,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          trivy image \
-            --image-src oci-dir \
-            --input ./oci-layout \
+          ls -al ./oci-layout  # should show index.json
+          trivy image oci-dir:./oci-layout \
             --exit-code 1 \
             --severity CRITICAL,HIGH \
             --ignore-unfixed
