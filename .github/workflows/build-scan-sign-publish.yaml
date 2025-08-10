@@ -102,7 +102,7 @@ jobs:
             --build-arg DATE_TAG=${{ matrix.date_tag }} \
             -t ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }} \
             -t ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }} \
-            --load \
+            --output=type=oci,dest=./image-oci.tar \
             -f ${{ matrix.path }}/Dockerfile \
             .
 
@@ -126,7 +126,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: '${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}'
+          input: ./image-oci.tar
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
