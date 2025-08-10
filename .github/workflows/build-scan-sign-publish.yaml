@@ -102,10 +102,9 @@ jobs:
             --build-arg DATE_TAG=${{ matrix.date_tag }} \
             -t ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }} \
             -t ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }} \
-            --output=type=oci,dest=./image-oci.tar \
+            --load \
             -f ${{ matrix.path }}/Dockerfile \
             .
-          test -f ./image-oci.tar && echo "OK: OCI tar ready"
 
     #   - name: Install Trivy
     #     shell: bash
@@ -114,15 +113,25 @@ jobs:
     #       curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
     #         | sh -s -- -b /usr/local/bin
 
-      - name: CVE gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          trivy image \
-            --input ./image-oci.tar \
-            --exit-code 1 \
-            --severity CRITICAL,HIGH \
-            --ignore-unfixed
+    #   - name: CVE gate
+    #     shell: bash
+    #     run: |
+    #       set -euo pipefail
+    #       trivy image \
+    #         --input ./image-oci.tar \
+    #         --exit-code 1 \
+    #         --severity CRITICAL,HIGH \
+    #         --ignore-unfixed
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: '${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'  
 
       - name: Promote and push image
         id: promote
