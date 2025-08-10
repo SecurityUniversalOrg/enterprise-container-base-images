@@ -117,6 +117,7 @@ jobs:
           echo "image_name=${REPO}/${NAME}" >> "$GITHUB_OUTPUT"
           # (optionally expose both tags)
           echo "image_tags=${TAG_PRIMARY},${TAG_SECONDARY}" >> "$GITHUB_OUTPUT"
+          echo "sbom_path=${REPO}-${NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Trivy vulnerability scanner CVE gate
         uses: aquasecurity/trivy-action@0.28.0
@@ -152,7 +153,7 @@ jobs:
         with:
           image: ${{ steps.build.outputs.image_ref }}
           format: spdx-json
-          artifact-name: sbom-${{ steps.build.outputs.image_name }}
+          artifact-name: sbom-${{ steps.build.outputs.sbom_path }}
 
 
       - uses: actions/upload-artifact@v4
