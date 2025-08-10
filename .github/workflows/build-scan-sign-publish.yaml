@@ -104,7 +104,7 @@ jobs:
             --output=type=oci,dest=./oci-layout \
             --file ${{ matrix.path }}/Dockerfile \
             .
-          ls -al ./oci-layout/  # debug: should contain index.json
+          ls -al ./oci-layout  # debug: should contain index.json
 
     #   - name: Install Trivy
     #     shell: bash
