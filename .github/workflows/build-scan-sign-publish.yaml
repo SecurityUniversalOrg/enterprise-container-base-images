@@ -94,6 +94,7 @@ jobs:
       
 
       - name: Build to local daemon (single-arch)
+        id: build
         run: |
           docker buildx build \
             --platform linux/amd64 \
