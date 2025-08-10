@@ -117,7 +117,8 @@ jobs:
           echo "image_name=${REPO}/${NAME}" >> "$GITHUB_OUTPUT"
           # (optionally expose both tags)
           echo "image_tags=${TAG_PRIMARY},${TAG_SECONDARY}" >> "$GITHUB_OUTPUT"
-          echo "sbom_path=${REPO}-${NAME}" >> "$GITHUB_OUTPUT"
+          SBOM_PATH="${REPO//\//-}-${NAME}"
+          echo "sbom_path=${SBOM_PATH}" >> "$GITHUB_OUTPUT"
 
       - name: Trivy vulnerability scanner CVE gate
         uses: aquasecurity/trivy-action@0.28.0
