@@ -122,12 +122,12 @@ jobs:
           name: sbom-${{ matrix.name }}
           path: sbom/${{ matrix.name }}.spdx.json
 
-      - name: Install Trivy
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-            | sh -s -- -b /usr/local/bin
+    #   - name: Install Trivy
+    #     shell: bash
+    #     run: |
+    #       set -euo pipefail
+    #       curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+    #         | sh -s -- -b /usr/local/bin
 
       - name: CVE gate
         shell: bash
@@ -136,14 +136,14 @@ jobs:
           trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed \
             "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}"
 
-      - name: Install cosign
-        shell: bash
-        run: |
-          set -euo pipefail
-          COSIGN_VERSION="v2.2.4"
-          curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" \
-            -o cosign
-          chmod +x cosign && sudo mv cosign /usr/local/bin/
+    #   - name: Install cosign
+    #     shell: bash
+    #     run: |
+    #       set -euo pipefail
+    #       COSIGN_VERSION="v2.2.4"
+    #       curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" \
+    #         -o cosign
+    #       chmod +x cosign && sudo mv cosign /usr/local/bin/
 
       - name: Sign container
         env:
