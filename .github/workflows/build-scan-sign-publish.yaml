@@ -118,7 +118,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          trivy image oci-archive:./image-oci.tar \
+          trivy image \
+            --input ./image-oci.tar \
             --exit-code 1 \
             --severity CRITICAL,HIGH \
             --ignore-unfixed
