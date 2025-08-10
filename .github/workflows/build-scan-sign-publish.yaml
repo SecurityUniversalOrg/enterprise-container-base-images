@@ -96,6 +96,8 @@ jobs:
       - name: Build to local daemon (single-arch)
         id: build
         run: |
+          set -euo pipefail
+          rm rf ./oci-layout && mkdir -p ./oci-layout
           docker buildx build \
             --platform linux/amd64 \
             --build-arg DATE_TAG=${{ matrix.date_tag }} \
@@ -104,7 +106,7 @@ jobs:
             --output=type=oci,dest=./oci-layout \
             --file ${{ matrix.path }}/Dockerfile \
             .
-          ls -al ./oci-layout  # debug: should contain index.json
+          test -f ./oci-layout/index.json && echo "OK: OCI dir ready"
 
     #   - name: Install Trivy
     #     shell: bash
@@ -117,19 +119,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ls -al ./oci-layout  # should show index.json
           trivy image oci-dir:./oci-layout \
-            --exit-code 1 \
-            --severity CRITICAL,HIGH \
-            --ignore-unfixed
+            --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed
 
       - name: Promote and push image
         id: promote
         shell: bash
         run: |
-          set -euo pipefail
           SRC="oci:./oci-layout"
-          # NOTE: ${{ needs.prepare.outputs.repo }} ALREADY starts with docker.io/...
           skopeo copy "$SRC" "docker://${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}"
           skopeo copy "$SRC" "docker://${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}"
 
