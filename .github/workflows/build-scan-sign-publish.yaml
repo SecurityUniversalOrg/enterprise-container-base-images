@@ -102,7 +102,7 @@ jobs:
             --build-arg DATE_TAG=${{ matrix.date_tag }} \
             -t ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }} \
             -t ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }} \
-            --output=type=oci,dest=./image-oci.tar \
+            --load \
             -f ${{ matrix.path }}/Dockerfile \
             .
 
@@ -126,7 +126,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          input: ./image-oci.tar
+          image-ref: '${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
@@ -137,10 +137,10 @@ jobs:
         id: promote
         shell: bash
         run: |
-          skopeo copy oci-archive:./image-oci.tar \
-            "docker://${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}"
-          skopeo copy oci-archive:./image-oci.tar \
-            "docker://${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}"
+          docker push \
+            ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}
+          docker push \
+            ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}
 
 
     #   - name: Install cosign
