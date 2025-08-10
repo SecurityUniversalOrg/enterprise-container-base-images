@@ -91,22 +91,16 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
-        if: startsWith(needs.prepare.outputs.repo, 'docker.io/')
-        uses: docker/login-action@v3
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
 
-      - name: Build to OCI archive
+      - name: Build to local daemon (single-arch)
         run: |
           docker buildx build \
-            --platform linux/amd64,linux/arm64 \
+            --platform linux/amd64 \
             --build-arg DATE_TAG=${{ matrix.date_tag }} \
             --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }} \
             --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }} \
-            --output type=oci,dest=oci/${{ matrix.name }}.tar \
+            --load \
             .
 
       - name: Generate SBOM (SPDX JSON)
@@ -152,6 +146,14 @@ jobs:
         run: |
           set -euo pipefail
           cosign sign "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}"
+
+      - name: Login to Docker Hub
+        if: startsWith(needs.prepare.outputs.repo, 'docker.io/')
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Publish container
         run: |
