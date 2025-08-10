@@ -99,15 +99,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ matrix.path }}
-          push: true
-          provenance: true
-          tags: |
-            ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}
-            ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}
+      - name: Build to OCI archive
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg DATE_TAG=${{ matrix.date_tag }} \
+            --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }} \
+            --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }} \
+            --output type=oci,dest=oci/${{ matrix.name }}.tar \
+            .
 
       - name: Generate SBOM (SPDX JSON)
         uses: anchore/sbom-action@v0
@@ -152,6 +152,11 @@ jobs:
         run: |
           set -euo pipefail
           cosign sign "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}"
+
+      - name: Publish container
+        run: |
+          docker push "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}"
+          docker push "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}"
 
   summarize:
     needs: [prepare, build]
