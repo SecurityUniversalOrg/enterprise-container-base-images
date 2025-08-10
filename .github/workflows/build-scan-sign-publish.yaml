@@ -97,16 +97,15 @@ jobs:
         id: build
         run: |
           set -euo pipefail
-          rm -rf ./oci-layout && mkdir -p ./oci-layout
           docker buildx build \
             --platform linux/amd64 \
             --build-arg DATE_TAG=${{ matrix.date_tag }} \
-            --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }} \
-            --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }} \
-            --output=type=oci,tar=false,dest=./oci-layout \
-            --file ${{ matrix.path }}/Dockerfile \
+            -t ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }} \
+            -t ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }} \
+            --output=type=oci,dest=./image-oci.tar \
+            -f ${{ matrix.path }}/Dockerfile \
             .
-          test -f ./oci-layout/index.json && echo "OK: OCI dir ready"
+          test -f ./image-oci.tar && echo "OK: OCI tar ready"
 
     #   - name: Install Trivy
     #     shell: bash
@@ -119,16 +118,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          trivy image oci-dir:./oci-layout \
-            --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed
+          trivy image oci-archive:./image-oci.tar \
+            --exit-code 1 \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed
 
       - name: Promote and push image
         id: promote
         shell: bash
         run: |
-          SRC="oci:./oci-layout"
-          skopeo copy "$SRC" "docker://${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}"
-          skopeo copy "$SRC" "docker://${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}"
+          skopeo copy oci-archive:./image-oci.tar \
+            "docker://${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}"
+          skopeo copy oci-archive:./image-oci.tar \
+            "docker://${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}"
+
 
     #   - name: Install cosign
     #     shell: bash
