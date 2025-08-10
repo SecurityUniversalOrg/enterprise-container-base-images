@@ -97,7 +97,7 @@ jobs:
         id: build
         run: |
           set -euo pipefail
-          rm rf ./oci-layout && mkdir -p ./oci-layout
+          rm -rf ./oci-layout && mkdir -p ./oci-layout
           docker buildx build \
             --platform linux/amd64 \
             --build-arg DATE_TAG=${{ matrix.date_tag }} \
