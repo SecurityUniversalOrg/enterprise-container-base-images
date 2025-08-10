@@ -101,11 +101,9 @@ jobs:
             --build-arg DATE_TAG=${{ matrix.date_tag }} \
             --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }} \
             --tag ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }} \
-            --output=type=oci,dest=./image.oci \
+            --output=type=oci,dest=./oci-layout \
             --file ${{ matrix.path }}/Dockerfile \
             .
-
-      
 
     #   - name: Install Trivy
     #     shell: bash
@@ -118,15 +116,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          trivy image --input ./image.oci --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed
+          trivy image --input oci-dir:./oci-layout --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed
 
       - name: Promote and push image
         id: promote
         shell: bash
         run: |
           set -euo pipefail
-          skopeo copy oci-archive:./image.oci docker://docker.io/${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}
-          skopeo copy oci-archive:./image.oci docker://docker.io/${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}
+          skopeo copy oci:./oci-layout docker://docker.io/${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}
+          skopeo copy oci:./oci-layout docker://docker.io/${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}
 
     #   - name: Install cosign
     #     shell: bash
