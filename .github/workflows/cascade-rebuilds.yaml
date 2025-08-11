@@ -117,16 +117,17 @@ jobs:
     if: needs.plan.outputs.subset != '[]'
     runs-on: ubuntu-latest
     steps:
-      - name: Dispatch local build (subset)
-        uses: adityakar/workflow-dispatcher@v1.0
-        with:
-            owner: SecurityUniversalOrg
-            repo: platform-container-base-images
-            token: ${{ secrets.PAT }}
-            event_type: dev-deploy
-            client_payload: '{"git-ref": "${{ github.event.inputs.git-ref }}"}'
-            wait_time: 5
-            max_time: 180
+      - name: Repository dispatch via API
+        env:
+            GH_TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}  # PAT with repo+workflow
+        run: |
+            set -euo pipefail
+            curl -sS -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            https://api.github.com/repos/SecurityUniversalOrg/platform-container-base-images/dispatches \
+            -d '{"event_type":"dev-deploy","client_payload":{"git-ref":"main"}}'
+
 
 
   notify_downstream:
