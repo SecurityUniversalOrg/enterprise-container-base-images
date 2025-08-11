@@ -1,14 +1,15 @@
+---
 name: Cascade Rebuilds
 
 on:
   push:
     branches: [main]
     paths:
-      - 'images/**'
-      - 'dependency-graph.yaml'
-      - 'matrix.yaml'
+      - images/**
+      - dependency-graph.yaml
+      - matrix.yaml
   schedule:
-    - cron: "0 6 1 * *"   # monthly, 06:00 UTC on the 1st
+    - cron: "0 6 1 * *" # monthly, 06:00 UTC on the 1st
   workflow_dispatch:
     inputs:
       roots:
@@ -34,70 +35,82 @@ jobs:
 
       - name: Compute cascade subset
         id: compute
+        env:
+          ROOTS: ${{ inputs.roots }}
+          FULL_REBUILD: ${{ inputs.full_rebuild }}
+          EVENT_NAME: ${{ github.event_name }}
+        shell: bash
         run: |
+          set -euo pipefail
           python3 - <<'PY'
-import os, yaml, json, subprocess
-# Load dependency graph and matrix
-dep = yaml.safe_load(open('dependency-graph.yaml'))
-mat = yaml.safe_load(open('matrix.yaml'))
-all_names = set(i['name'] for i in mat.get('images', []))
+          import os, yaml, json, subprocess, collections
 
-def changed_roots_from_git():
-    # Look at the last commit diff on push; fallback to empty on schedule
-    try:
-        out = subprocess.check_output(["git","diff","--name-only","HEAD~1..HEAD"], text=True)
-    except Exception:
-        return set()
-    roots=set()
-    for line in out.splitlines():
-        parts=line.strip().split('/')
-        # expects images/<category>/<name>/<version>/Dockerfile or similar
-        if parts and parts[0]=="images":
-            # Map path to matrix.name; we rely on matrix names rather than paths here.
-            # Simplest heuristic: take top-level name folder under category
-            # e.g., images/base/ubuntu/24.04 -> 'base-ubuntu'
-            if len(parts)>=3:
-                cat=parts[1]; name=parts[2]
-                candidate=f"{cat}-{name}".replace('_','-')
-                if candidate in all_names:
-                    roots.add(candidate)
-    return roots
+          # Load dependency graph and matrix
+          with open('dependency-graph.yaml', 'r') as f:
+              dep = yaml.safe_load(f) or {}
+          with open('matrix.yaml', 'r') as f:
+              mat = yaml.safe_load(f) or {}
 
-def walk(roots, dep):
-    seen=set()
-    stack=list(roots)
-    while stack:
-        n=stack.pop()
-        if n in seen: continue
-        seen.add(n)
-        for c in dep.get(n,[]) or []:
-            stack.append(c)
-    return seen
+          images = mat.get('images', []) or []
+          all_names = {i['name'] for i in images if 'name' in i}
 
-# Inputs
-roots_in = os.getenv('INPUT_ROOTS','').strip()
-full = (os.getenv('INPUT_FULL_REBUILD','false').lower() == 'true')
-schedule_event = os.getenv('GITHUB_EVENT_NAME') == 'schedule'
+          def changed_roots_from_git():
+              try:
+                  out = subprocess.check_output(
+                      ["git", "diff", "--name-only", "HEAD~1..HEAD"],
+                      text=True
+                  )
+              except Exception:
+                  return set()
+              roots = set()
+              for line in out.splitlines():
+                  parts = line.strip().split('/')
+                  # expects images/<category>/<name>/...
+                  if len(parts) >= 3 and parts[0] == "images":
+                      candidate = f"{parts[1]}-{parts[2]}".replace('_', '-')
+                      if candidate in all_names:
+                          roots.add(candidate)
+              return roots
 
-subset=set()
+          def walk(roots, graph):
+              seen = set()
+              stack = list(roots)
+              while stack:
+                  n = stack.pop()
+                  if n in seen:
+                      continue
+                  seen.add(n)
+                  for c in (graph.get(n) or []):
+                      stack.append(c)
+              return seen
 
-if full or schedule_event:
-    subset = all_names
-else:
-    if roots_in:
-        roots = set(x.strip() for x in roots_in.split(',') if x.strip())
-    else:
-        roots = changed_roots_from_git()
+          roots_in = (os.getenv('ROOTS') or '').strip()
+          full = (os.getenv('FULL_REBUILD') or 'false').lower() == 'true'
+          schedule_event = (os.getenv('EVENT_NAME') == 'schedule')
 
-    if roots:
-        subset = walk(roots, dep)
-    else:
-        subset = set()
+          selected = set()
+          if full or schedule_event:
+              selected = all_names
+          else:
+              if roots_in:
+                  roots = {x.strip() for x in roots_in.split(',') if x.strip()}
+              else:
+                  roots = changed_roots_from_git()
 
-subset = [n for n in mat['images'] if n['name'] in subset]
-print(json.dumps(subset))
-open(os.environ['GITHUB_OUTPUT'],'a').write("subset="+json.dumps([x['name'] for x in subset])+"\n")
-PY
+              if roots:
+                  selected = walk(roots, dep)
+              else:
+                  selected = set()
+
+          # Keep original matrix entries but filtered by name
+          matrix_subset = [i for i in images if i.get('name') in selected]
+          # Output only the list of names as the job output
+          names_subset = [i['name'] for i in matrix_subset]
+
+          # Write to GITHUB_OUTPUT
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as gh:
+              gh.write("subset=" + json.dumps(names_subset) + "\n")
+          PY
 
   rebuild_here:
     needs: plan
@@ -108,7 +121,7 @@ PY
         uses: benc-uk/workflow-dispatch@v1
         with:
           token: ${{ secrets.SELF_DISPATCH_TOKEN }}
-          workflow: Build • Scan • Sign • Publish
+          workflow: Build - Scan - Sign - Publish
           ref: main
           inputs: |
             subset=${{ join(fromJson(needs.plan.outputs.subset), ',') }}
@@ -121,11 +134,12 @@ PY
 
       - name: Load downstream map (optional)
         id: map
+        shell: bash
         run: |
           if [ -f ".downstreams.yaml" ]; then
-            echo "present=true" >> $GITHUB_OUTPUT
+            echo "present=true" >> "$GITHUB_OUTPUT"
           else
-            echo "present=false" >> $GITHUB_OUTPUT
+            echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Emit repository_dispatch to downstreams
@@ -140,7 +154,13 @@ PY
             const yaml = require('js-yaml');
 
             const subset = JSON.parse(process.env.SUBSET);
+            const hasFile = fs.existsSync('.downstreams.yaml');
+            if (!hasFile) {
+              core.info("No .downstreams.yaml found.");
+              return;
+            }
             const doc = yaml.load(fs.readFileSync('.downstreams.yaml','utf8')) || {};
+
             // .downstreams.yaml example:
             // runners:
             //   repo: "your-enterprise-org/platform-arc-runner-images"
@@ -154,10 +174,12 @@ PY
 
             const targets = [];
             if (doc.runners && doc.runners.repo && doc.runners.mapping) {
-              let agg = new Set();
+              const agg = new Set();
               for (const base of subset) {
                 const mapped = doc.runners.mapping[base];
-                if (Array.isArray(mapped)) for (const m of mapped) agg.add(m);
+                if (Array.isArray(mapped)) {
+                  for (const m of mapped) agg.add(m);
+                }
               }
               if (agg.size > 0) {
                 targets.push({
