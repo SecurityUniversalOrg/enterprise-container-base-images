@@ -1,0 +1,17 @@
+base-ubuntu:
+- web-apache
+- web-flask
+- lang-python
+- lang-node
+base-ubuntu-slim: []
+base-ubi9-fips: []
+web-apache:
+- web-flask
+web-flask: []
+lang-python: []
+lang-java: []
+lang-java-jdk: []
+lang-node: []
+lang-dotnet: []
+lang-dotnet-sdk: []
+lang-go: []
