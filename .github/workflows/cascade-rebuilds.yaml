@@ -64,7 +64,7 @@ jobs:
             -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
             -H "User-Agent: repo-dispatch" \
             https://api.github.com/repos/SecurityUniversalOrg/platform-container-base-images/dispatches \
-            -d '{"event_type":"dev-deploy","client_payload":{"git-ref":"main"}}'
+            -d '{"event_type":"base-images-updated","client_payload":{"dockerhub_namespace":"securityuniversal", "subset":'${{ needs.plan.outputs.subset }}'}}'
 
   notify_downstream:
     needs: plan
