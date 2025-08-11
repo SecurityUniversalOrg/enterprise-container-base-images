@@ -118,14 +118,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch local build (subset)
-        uses: peter-evans/workflow-dispatch@v3
+        uses: adityakar/workflow-dispatcher@v1.0
         with:
-            token: ${{ secrets.SELF_DISPATCH_TOKEN }}
-            repository: ${{ github.repository }}       # or <org>/<repo> if different
-            workflow: build-scan-sign-publish.yml      # file name OR exact workflow name
-            ref: main
-            inputs:
-            subset: ${{ join(fromJson(needs.plan.outputs.subset), ',') }}
+            owner: SecurityUniversalOrg
+            repo: platform-container-base-images
+            token: ${{ secrets.PAT }}
+            event_type: dev-deploy
+            client_payload: '{"git-ref": "${{ github.event.inputs.git-ref }}"}'
+            wait_time: 5
+            max_time: 180
 
 
   notify_downstream:
