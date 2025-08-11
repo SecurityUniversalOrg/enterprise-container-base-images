@@ -2,15 +2,6 @@
 name: Build-Scan-Sign-Publish
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - images/**
-      - matrix.yaml
-  pull_request:
-    paths:
-      - images/**
-      - matrix.yaml
   workflow_dispatch:
     inputs:
       subset:
@@ -27,6 +18,9 @@ on:
         required: false
         type: string
         default: ""
+  repository_dispatch:
+    types:
+      - base-images-updated
 
 permissions:
   contents: read
@@ -55,8 +49,10 @@ jobs:
           set -euo pipefail
           if [ -n "${{ inputs.repo }}" ]; then
             echo "repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.client_payload.dockerhub_namespace }}" ]; then
+            echo "repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
           else
-            python3 -c 'import yaml,os,sys; m=yaml.safe_load(open("matrix.yaml")); ns=m.get("dockerhub_namespace"); owner=os.environ.get("GITHUB_REPOSITORY_OWNER",""); repo=f"docker.io/{ns}" if ns else f"docker.io/{owner}"; print(f"repo={repo}")' >> "$GITHUB_OUTPUT"
+            python3 ./resolve_repo_prefix.py >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build matrix (optionally filter by subset)
