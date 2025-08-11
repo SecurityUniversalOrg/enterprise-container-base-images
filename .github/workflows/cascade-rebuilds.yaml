@@ -46,6 +46,8 @@ jobs:
           set -euo pipefail
           echo "Computing cascade subset with roots: '${{ inputs.roots }}' and full_rebuild=${{ inputs.full_rebuild }}"
           python3 -s scripts/compute_cascade_subset.py
+          echo "Subset from GITHUB_OUTPUT:"
+          grep '^subset=' "$GITHUB_OUTPUT" | sed 's/^subset=//'
 
   rebuild_here:
     needs: plan
