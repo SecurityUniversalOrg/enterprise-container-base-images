@@ -52,7 +52,7 @@ jobs:
           elif [ -n "${{ github.event.client_payload.dockerhub_namespace }}" ]; then
             echo "repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
           else
-            python3 ./resolve_repo_prefix.py >> "$GITHUB_OUTPUT"
+            python3 ./scripts/resolve_repo_prefix.py >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build matrix (optionally filter by subset)
