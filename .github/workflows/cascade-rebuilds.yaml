@@ -118,13 +118,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch local build (subset)
-        uses: benc-uk/workflow-dispatch@v1
+        uses: peter-evans/workflow-dispatch@v3
         with:
-          token: ${{ secrets.SELF_DISPATCH_TOKEN }}
-          workflow: Build - Scan - Sign - Publish
-          ref: main
-          inputs: |
-            subset=${{ join(fromJson(needs.plan.outputs.subset), ',') }}
+            token: ${{ secrets.SELF_DISPATCH_TOKEN }}
+            repository: ${{ github.repository }}       # or <org>/<repo> if different
+            workflow: build-scan-sign-publish.yml      # file name OR exact workflow name
+            ref: main
+            inputs:
+            subset: ${{ join(fromJson(needs.plan.outputs.subset), ',') }}
+
 
   notify_downstream:
     needs: plan
