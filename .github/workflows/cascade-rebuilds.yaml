@@ -119,12 +119,12 @@ jobs:
     steps:
       - name: Repository dispatch via API
         env:
-          GH_TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}  # PAT with repo+workflow
+          DISPATCH_TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}  # PAT with repo+workflow
         run: |
           set -euo pipefail
           curl -sS -X POST \
             -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
             -H "User-Agent: repo-dispatch" \
             https://api.github.com/repos/SecurityUniversalOrg/platform-container-base-images/dispatches \
             -d '{"event_type":"dev-deploy","client_payload":{"git-ref":"main"}}'
