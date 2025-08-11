@@ -1,0 +1,65 @@
+---
+name: Test Repository Dispatch
+
+on:
+  repository_dispatch:
+    types:
+      - dev-deploy
+      - base-images-updated
+      - ping
+
+permissions:
+  contents: read
+
+jobs:
+  show-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show event basics
+        run: |
+          echo "Event: ${{ github.event.action || 'N/A' }}"
+          echo "Type : ${{ github.event.action || github.event.client_payload.event_type || 'N/A' }}"
+          echo "Sender: ${{ github.actor }}"
+          echo "Repo  : ${{ github.repository }}"
+
+      - name: Dump full event (for debugging)
+        run: |
+          echo '${{ toJson(github.event) }}' | sed 's/["{}]/&/g' >/dev/null
+          echo "client_payload:"
+          echo '${{ toJson(github.event.client_payload) }}'
+
+      - name: Validate required fields for dev-deploy
+        if: github.event.action == 'dev-deploy'
+        shell: bash
+        run: |
+          set -euo pipefail
+          REF='${{ github.event.client_payload.git-ref }}'
+          if [ -z "${REF}" ] || [ "${REF}" = "null" ]; then
+            echo "::error title=Missing field::client_payload.git-ref is required for dev-deploy"
+            exit 1
+          fi
+          echo "OK: git-ref=${REF}"
+
+      - name: Validate required fields for base-images-updated
+        if: github.event.action == 'base-images-updated'
+        shell: bash
+        run: |
+          set -euo pipefail
+          NS='${{ github.event.client_payload.dockerhub_namespace }}'
+          SUBSET='${{ github.event.client_payload.subset }}'
+          if [ -z "${NS}" ] || [ "${NS}" = "null" ]; then
+            echo "::error title=Missing field::client_payload.dockerhub_namespace is required"
+            exit 1
+          fi
+          echo "OK: dockerhub_namespace=${NS}"
+          echo "subset=${SUBSET:-<empty>}"
+
+      - name: Act on subset (optional)
+        if: github.event.action == 'base-images-updated' && github.event.client_payload.subset != ''
+        env:
+          SUBSET_JSON: ${{ toJson(github.event.client_payload.subset) }}
+        run: |
+          echo "Subset (string): ${{ github.event.client_payload.subset }}"
+          IFS=',' read -ra ARR <<< "${{ github.event.client_payload.subset }}"
+          echo "Parsed items:"
+          for i in "${ARR[@]}"; do echo " - $i"; done
