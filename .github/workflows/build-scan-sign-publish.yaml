@@ -57,25 +57,28 @@ jobs:
           echo "Repo prefix from GITHUB_OUTPUT:"
           grep '^repo=' "$GITHUB_OUTPUT" | sed 's/^repo=//'
 
-      - name: Build matrix by Repo Dispatch
-        if: github.event.action == 'base-images-updated'
-        id: matrix
+      - name: Determine matrix subset
+        id: determinesubset
         shell: bash
-        env:
-          SUBSET: ${{ inputs.subset }}
         run: |
           set -euo pipefail
-          python3 ./scripts/build_matrix.py
-          echo "Matrix from GITHUB_OUTPUT:"
-          grep '^matrix=' "$GITHUB_OUTPUT" | sed 's/^matrix=//'
+          if [ -n "${{ inputs.subset }}" ]; then
+            echo "subset=${{ inputs.subset }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.client_payload.subset }}" ]; then
+            echo "subset=${{ github.event.client_payload.subset }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "No subset provided, using full matrix."
+            echo "subset=${{ inputs.subset }}" >> "$GITHUB_OUTPUT"
+          fi
           echo "Debug GitHub Event: ${{ toJson(github.event) }}"
+          echo "Subset value from GITHUB_OUTPUT:"
+          grep '^subset=' "$GITHUB_OUTPUT" | sed 's/^subset=//'
 
       - name: Build matrix (optionally filter by subset)
-        if: github.event.action != 'base-images-updated'
         id: matrix
         shell: bash
         env:
-          SUBSET: ${{ inputs.subset }}
+          SUBSET: ${{ steps.determinesubset.outputs.subset }}
         run: |
           set -euo pipefail
           python3 ./scripts/build_matrix.py
