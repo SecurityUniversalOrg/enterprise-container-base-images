@@ -54,6 +54,8 @@ jobs:
           else
             python3 ./scripts/resolve_repo_prefix.py >> "$GITHUB_OUTPUT"
           fi
+          echo "Repo prefix from GITHUB_OUTPUT:"
+          grep '^repo=' "$GITHUB_OUTPUT" | sed 's/^repo=//'
 
       - name: Build matrix (optionally filter by subset)
         id: matrix
@@ -62,16 +64,9 @@ jobs:
           SUBSET: ${{ inputs.subset }}
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import os, json, yaml
-          m = yaml.safe_load(open('matrix.yaml'))
-          subset = os.getenv('SUBSET','').strip()
-          images = m.get('images', [])
-          if subset:
-            wanted = {x.strip() for x in subset.split(',') if x.strip()}
-            images = [i for i in images if i.get('name') in wanted]
-          open(os.environ['GITHUB_OUTPUT'],'a').write("matrix="+json.dumps(images)+"\n")
-          PY
+          python3 ./scripts/build_matrix.py
+          echo "Matrix from GITHUB_OUTPUT:"
+          grep '^matrix=' "$GITHUB_OUTPUT" | sed 's/^matrix=//'
 
   build:
     needs: prepare
