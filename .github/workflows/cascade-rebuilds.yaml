@@ -71,7 +71,7 @@ jobs:
 
             BODY=$(jq -n \
             --arg event "base-images-updated" \
-            --arg ns "securityuniversal" \
+            --arg ns "docker.io/securityuniversal" \
             --argjson subset "${SUBSET_JSON}" \
             '{event_type:$event, client_payload:{dockerhub_namespace:$ns, subset:$subset}}')
 

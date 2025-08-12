@@ -50,14 +50,28 @@ jobs:
           if [ -n "${{ inputs.repo }}" ]; then
             echo "repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
           elif [ -n "${{ github.event.client_payload.dockerhub_namespace }}" ]; then
-            echo "repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
+            echo "repo=${{ github.event.client_payload.dockerhub_namespace }}" >> "$GITHUB_OUTPUT"
           else
             python3 ./scripts/resolve_repo_prefix.py >> "$GITHUB_OUTPUT"
           fi
           echo "Repo prefix from GITHUB_OUTPUT:"
           grep '^repo=' "$GITHUB_OUTPUT" | sed 's/^repo=//'
 
+      - name: Build matrix by Repo Dispatch
+        if: github.event.action == 'base-images-updated'
+        id: matrix
+        shell: bash
+        env:
+          SUBSET: ${{ inputs.subset }}
+        run: |
+          set -euo pipefail
+          python3 ./scripts/build_matrix.py
+          echo "Matrix from GITHUB_OUTPUT:"
+          grep '^matrix=' "$GITHUB_OUTPUT" | sed 's/^matrix=//'
+          echo "Debug GitHub Event: ${{ toJson(github.event) }}"
+
       - name: Build matrix (optionally filter by subset)
+        if: github.event.action != 'base-images-updated'
         id: matrix
         shell: bash
         env:
