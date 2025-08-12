@@ -64,8 +64,9 @@ jobs:
           set -euo pipefail
           if [ -n "${{ inputs.subset }}" ]; then
             echo "subset=${{ inputs.subset }}" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ github.event.client_payload.subset }}" ]; then
-            echo "subset=${{ github.event.client_payload.subset }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ toJson(github.event.client_payload.subset) }}" ]; then
+            # Join the array into a comma-separated string
+            echo "subset=${{ join(github.event.client_payload.subset, ',') }}" >> "$GITHUB_OUTPUT"
           else
             echo "No subset provided, using full matrix."
             echo "subset=${{ inputs.subset }}" >> "$GITHUB_OUTPUT"
