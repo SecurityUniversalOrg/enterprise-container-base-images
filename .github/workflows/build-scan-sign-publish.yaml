@@ -204,6 +204,20 @@ jobs:
           name: sbom-${{ matrix.name }}
           path: sbom.spdx.json
 
+      - name: Notify dependent layers
+        id: notify-dependents
+        env:
+          ROOTS: ${{ matrix.name }}
+          FULL_REBUILD: false
+          EVENT_NAME: ${{ github.event_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Computing cascade subset with roots: '${ROOTS}'"
+          python3 -s scripts/compute_cascade_subset.py
+          echo "Would have rebuilt:"
+          grep '^subset=' "$GITHUB_OUTPUT" | sed 's/^subset=//'
+
   summarize:
     needs: [prepare, build]
     runs-on: federal
