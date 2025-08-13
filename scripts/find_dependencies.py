@@ -56,7 +56,7 @@ matrix_subset = []
 for i in images:
     for s in selected:
         if i.get('name') == s.split(':')[0]:
-            matrix_subset.append(i)
+            matrix_subset.append(s)
 print(f"Filtered matrix entries: {matrix_subset}")
 # Output only the list of names as the job output
 
