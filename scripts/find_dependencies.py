@@ -43,6 +43,7 @@ def find_direct_dependencies(roots, graph):
     return seen
 
 roots_in = (os.getenv('ROOTS') or '')
+roots_in = 'base-ubuntu'
 print(f"Roots input: {roots_in}")
 
 roots = {x.strip() for x in roots_in.split(',') if x.strip()}
@@ -51,7 +52,11 @@ selected = find_direct_dependencies(roots, dep)
 print(f"Selected dependencies: {selected}")
 
 # Keep original matrix entries but filtered by name
-matrix_subset = [i for i in images if i.get('name') in selected]
+matrix_subset = []
+for i in images:
+    for s in selected:
+        if i.get('name') == s.split(':')[0]:
+            matrix_subset.append(i)
 print(f"Filtered matrix entries: {matrix_subset}")
 # Output only the list of names as the job output
 names_subset = [i['name'] for i in matrix_subset]
