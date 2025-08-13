@@ -49,6 +49,7 @@ if full or schedule_event:
     selected = all_names
 else:
     if roots_in:
+        print(f"Using provided roots: {roots_in}")
         roots = {x.strip() for x in roots_in.split(',') if x.strip()}
     else:
         roots = changed_roots_from_git()
