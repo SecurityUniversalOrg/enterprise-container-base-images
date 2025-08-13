@@ -59,9 +59,7 @@ for i in images:
             matrix_subset.append(i)
 print(f"Filtered matrix entries: {matrix_subset}")
 # Output only the list of names as the job output
-names_subset = [i['name'] for i in matrix_subset]
-print(f"Names subset: {names_subset}")
 
 # Write to GITHUB_OUTPUT
 with open(os.environ['GITHUB_OUTPUT'], 'a') as gh:
-    gh.write("subset=" + json.dumps(names_subset) + "\n")
+    gh.write("subset=" + json.dumps(matrix_subset) + "\n")
