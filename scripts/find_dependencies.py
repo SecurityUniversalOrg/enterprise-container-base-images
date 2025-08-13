@@ -36,10 +36,14 @@ def find_direct_dependencies(roots, graph):
         root_name = root[0]
         dependents = graph.get(root_name, [])
         for n in dependents:
-            seen.add(n)
+            for image in n:
+                for repo in n[image]:
+                    add_name = f"{image}:{repo}"
+                    seen.add(add_name)
     return seen
 
 roots_in = (os.getenv('ROOTS') or '')
+roots_in = 'base-ubuntu'
 roots = {x.strip() for x in roots_in.split(',') if x.strip()}
 selected = find_direct_dependencies(roots, dep)
 
