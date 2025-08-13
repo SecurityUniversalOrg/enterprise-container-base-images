@@ -43,14 +43,19 @@ def find_direct_dependencies(roots, graph):
     return seen
 
 roots_in = (os.getenv('ROOTS') or '')
+print(f"Roots input: {roots_in}")
 
 roots = {x.strip() for x in roots_in.split(',') if x.strip()}
+print(f"Parsed roots: {roots}")
 selected = find_direct_dependencies(roots, dep)
+print(f"Selected dependencies: {selected}")
 
 # Keep original matrix entries but filtered by name
 matrix_subset = [i for i in images if i.get('name') in selected]
+print(f"Filtered matrix entries: {matrix_subset}")
 # Output only the list of names as the job output
 names_subset = [i['name'] for i in matrix_subset]
+print(f"Names subset: {names_subset}")
 
 # Write to GITHUB_OUTPUT
 with open(os.environ['GITHUB_OUTPUT'], 'a') as gh:
