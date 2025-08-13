@@ -1,6 +1,5 @@
 base-ubuntu:
 - web-apache
-- web-flask
 - lang-python
 - lang-node
 base-ubuntu-slim: []

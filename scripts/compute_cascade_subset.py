@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 import os, yaml, json, subprocess, collections
 
-# Load dependency graph and matrix
-with open('dependency-graph.yaml', 'r') as f:
-    dep = yaml.safe_load(f) or {}
+# Load matrix
 with open('matrix.yaml', 'r') as f:
     mat = yaml.safe_load(f) or {}
 
@@ -28,18 +26,6 @@ def changed_roots_from_git():
                 roots.add(candidate)
     return roots
 
-def find_dependencies(roots, graph):
-    seen = set()
-    stack = list(roots)
-    while stack:
-        n = stack.pop()
-        if n in seen:
-            continue
-        seen.add(n)
-        for c in (graph.get(n) or []):
-            stack.append(c)
-    return seen
-
 roots_in = (os.getenv('ROOTS') or '').strip()
 full = (os.getenv('FULL_REBUILD') or 'false').lower() == 'true'
 schedule_event = (os.getenv('EVENT_NAME') == 'schedule')
@@ -49,17 +35,12 @@ if full or schedule_event:
     selected = all_names
 else:
     if roots_in:
-        print(f"Using provided roots: {roots_in}")
         roots = {x.strip() for x in roots_in.split(',') if x.strip()}
     else:
         roots = changed_roots_from_git()
 
     if roots:
-        # Disabling dependency resolution for now
-        # selected = find_dependencies(roots, dep)
         selected = roots
-    else:
-        selected = set()
 
 # Keep original matrix entries but filtered by name
 matrix_subset = [i for i in images if i.get('name') in selected]

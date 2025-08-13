@@ -214,7 +214,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Computing cascade subset with roots: '${ROOTS}'"
-          python3 -s scripts/compute_cascade_subset.py
+          python3 -s scripts/find_dependencies.py
           echo "Would have rebuilt:"
           grep '^subset=' "$GITHUB_OUTPUT" | sed 's/^subset=//'
 
