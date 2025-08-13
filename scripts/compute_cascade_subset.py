@@ -28,7 +28,7 @@ def changed_roots_from_git():
                 roots.add(candidate)
     return roots
 
-def walk(roots, graph):
+def find_dependencies(roots, graph):
     seen = set()
     stack = list(roots)
     while stack:
@@ -54,7 +54,9 @@ else:
         roots = changed_roots_from_git()
 
     if roots:
-        selected = walk(roots, dep)
+        # Disabling dependency resolution for now
+        # selected = find_dependencies(roots, dep)
+        selected = roots
     else:
         selected = set()
 
