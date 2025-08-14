@@ -229,10 +229,10 @@ jobs:
           set -euo pipefail
           BODY=$(jq -n \
             --arg event "update-dependent-dockerfiles" \
-            --arg base  "${{ inputs.base_name }}" \
+            --arg base  "${{ matrix.name }}" \
             --arg old   "${{ inputs.old_tag }}" \
-            --arg new   "${{ inputs.new_tag }}" \
-            --arg reg   "${{ inputs.reg_prefix }}" \
+            --arg new   "${{ matrix.tags[0] }}" \
+            --arg reg   "${{ github.event.client_payload.dockerhub_namespace }}" \
             --argjson subset "${SUBSET_JSON}" \
             '{event_type:$event, client_payload:{base_name:$base, old_tag:$old, new_tag:$new, reg_prefix:$reg, subset:$subset}}')
           curl -sS -X POST \
