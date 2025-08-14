@@ -93,6 +93,8 @@ jobs:
       fail-fast: false
       matrix:
         include: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    outputs:
+      old_tag: ${{ steps.oldtag.outputs.old_tag }}    
     steps:
       - uses: actions/checkout@v4
 
@@ -204,6 +206,20 @@ jobs:
           name: sbom-${{ matrix.name }}
           path: sbom.spdx.json
 
+      - name: Get old tag from registry
+        id: oldtag
+        env:
+          IMAGE_NAME: ${{ github.event.client_payload.dockerhub_namespace }}/${{ matrix.name }}   # adjust as needed
+        run: |
+          set -euo pipefail
+          # Get all tags, sort by semantic/natural order, take the latest
+          old_tag=$(skopeo list-tags "docker://${IMAGE_NAME}" \
+            | jq -r '.Tags[]' \
+            | sort -V \
+            | tail -n 1)
+          echo "Old tag is: $old_tag"
+          echo "old_tag=$old_tag" >> "$GITHUB_OUTPUT"
+
       - name: Determine dependent layers
         id: determine-dependents
         env:
@@ -230,7 +246,7 @@ jobs:
           BODY=$(jq -n \
             --arg event "update-dependent-dockerfiles" \
             --arg base  "${{ matrix.name }}" \
-            --arg old   "${{ inputs.old_tag }}" \
+            --arg old   "${{ steps.oldtag.outputs.old_tag}}" \
             --arg new   "${{ matrix.tags[0] }}" \
             --arg reg   "${{ github.event.client_payload.dockerhub_namespace }}" \
             --argjson subset "${SUBSET_JSON}" \
