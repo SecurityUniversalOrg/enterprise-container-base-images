@@ -71,10 +71,11 @@ jobs:
 
             echo "::group::${repo_full} (${image})"
             workdir="$(mktemp -d)"
-            echo "trying repo clone"
             gh repo clone "${repo_full}" "$workdir/repo" -- -q
-            echo "completed repo clone"
             cd "$workdir/repo"
+
+            echo "Debugging Clone Repo Directory"
+            la -lah "$workdir/repo"
 
             # discover default base branch
             BASE_BRANCH="$(git remote show origin | awk '/HEAD branch/ {print $NF}')"
