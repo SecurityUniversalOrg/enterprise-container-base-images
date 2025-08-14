@@ -1,0 +1,116 @@
+# .github/workflows/update-dependent-dockerfiles.yaml
+name: Cascade • Update Dependent Dockerfiles
+
+on:
+  repository_dispatch:
+    types: [update-dependent-dockerfiles]
+
+permissions:
+  contents: write        # commit + push
+  pull-requests: write   # open PRs
+  id-token: none
+
+env:
+  # Optional: restrict which senders may trigger this workflow for safety
+  ALLOWED_SENDERS: SecurityUniversalOrg  # comma-separated org(s) or user(s)
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate sender
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          SENDER='${{ github.event.sender.login }}'
+          ALLOWED="${ALLOWED_SENDERS:-}"
+          if [ -n "$ALLOWED" ]; then
+            IFS=',' read -ra ALR <<< "$ALLOWED"
+            OK=false
+            for a in "${ALR[@]}"; do
+              [ "$SENDER" = "$a" ] && OK=true
+            done
+            $OK || { echo "Unauthorized sender: $SENDER"; exit 1; }
+          fi
+
+      - name: Extract payload
+        id: in
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "base_name=${{ github.event.client_payload.base_name }}" >> "$GITHUB_OUTPUT"
+          echo "old_tag=${{ github.event.client_payload.old_tag }}"   >> "$GITHUB_OUTPUT"
+          echo "new_tag=${{ github.event.client_payload.new_tag }}"   >> "$GITHUB_OUTPUT"
+          echo "reg_prefix=${{ github.event.client_payload.reg_prefix }}" >> "$GITHUB_OUTPUT"
+          jq -c '.client_payload.subset' <<< '${{ toJson(github.event) }}' > subset.json
+          echo "subset=$(cat subset.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Tooling (jq, gh, git)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
+      - name: Process each target repo
+        env:
+          GH_TOKEN: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}  # PAT or GitHub App token with repo contents + PRs on target repos
+          BASE_NAME: ${{ steps.in.outputs.base_name }}
+          OLD_TAG:   ${{ steps.in.outputs.old_tag }}
+          NEW_TAG:   ${{ steps.in.outputs.new_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # subset is like ["web-apache:SecurityUniversalOrg/platform-container-base-images", "lang-python:Org/repo", ...]
+          mapfile -t TARGETS < <(jq -r '.[]' <<< '${{ steps.in.outputs.subset }}')
+
+          for item in "${TARGETS[@]}"; do
+            image="${item%%:*}"
+            repo_full="${item#*:}"
+
+            echo "::group::${repo_full} (${image})"
+            workdir="$(mktemp -d)"
+            gh repo clone "${repo_full}" "$workdir/repo" -- -q
+            cd "$workdir/repo"
+
+            # discover default base branch
+            BASE_BRANCH="$(git remote show origin | awk '/HEAD branch/ {print $NF}')"
+            [ -n "$BASE_BRANCH" ] || BASE_BRANCH="main"
+            BRANCH="chore/bump-${image}-${BASE_NAME}-${NEW_TAG}"
+
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git checkout -b "$BRANCH"
+
+            set +e
+            python3 scripts/patch_dockerfiles.py .
+            status=$?
+            set -e
+            if [ $status -eq 10 ]; then
+              echo "No changes needed; skipping."
+              echo "::endgroup::"
+              continue
+            elif [ $status -ne 0 ]; then
+              echo "Patcher error (${status})"; exit $status
+            fi
+
+            if git diff --quiet; then
+              echo "No diff after patch; skip."
+              echo "::endgroup::"
+              continue
+            fi
+
+            git add -A
+            git commit -m "chore: bump ${BASE_NAME} ${OLD_TAG} → ${NEW_TAG} (affects ${image})"
+            git push -u origin "$BRANCH"
+
+            title="Bump ${BASE_NAME} to ${NEW_TAG} for ${image}"
+            body=$'Automated cascade update.\n\n- Base: '"\`${BASE_NAME}:${OLD_TAG}\` → \`${NEW_TAG}\`"$'\n- Affected image: '"\`${image}\`"$'\n- Registry prefix preserved.\n\n/cc @security-team @platform-team'
+
+            # Avoid duplicate PRs by title
+            if gh pr list --search "$title" --state open --json number | jq -e '. | length > 0' >/dev/null; then
+              echo "PR exists; not creating"
+            else
+              gh pr create --title "$title" --body "$body" --base "$BASE_BRANCH" --head "$BRANCH"
+            fi
+            echo "::endgroup::"
+          done
