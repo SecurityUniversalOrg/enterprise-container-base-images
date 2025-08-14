@@ -81,10 +81,12 @@ jobs:
             BASE_BRANCH="$(git remote show origin | awk '/HEAD branch/ {print $NF}')"
             [ -n "$BASE_BRANCH" ] || BASE_BRANCH="main"
             BRANCH="chore/bump-${image}-${BASE_NAME}-${NEW_TAG}"
+            echo "Base branch: $BASE_BRANCH, New branch: $BRANCH"
 
             git config user.name  "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git checkout -b "$BRANCH"
+            echo "Checking out branch: $BRANCH"
 
             set +e
             python3 scripts/patch_dockerfiles.py .
