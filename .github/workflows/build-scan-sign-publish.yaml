@@ -222,8 +222,9 @@ jobs:
         id: notify-dependents
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}   # PAT or GitHub App token scoped to the *updater repo*
-          OWNER: SecurityUniversalOrg                 # target owner
+          OWNER: ${{ github.repository_owner}}                 # target owner
           REPO:  ${{ github.repository }}          # target repo (Workflow B lives here)
+          SUBSET_JSON: ${{ steps.determine-dependents.outputs.subset }}
         shell: bash
         run: |
           set -euo pipefail
@@ -233,7 +234,7 @@ jobs:
             --arg old   "${{ inputs.old_tag }}" \
             --arg new   "${{ inputs.new_tag }}" \
             --arg reg   "${{ inputs.reg_prefix }}" \
-            --argjson subset '${{ steps.subset.outputs.json }}' \
+            --argjson subset "${SUBSET_JSON}" \
             '{event_type:$event, client_payload:{base_name:$base, old_tag:$old, new_tag:$new, reg_prefix:$reg, subset:$subset}}')
           curl -sS -X POST \
             -H "Accept: application/vnd.github+json" \
