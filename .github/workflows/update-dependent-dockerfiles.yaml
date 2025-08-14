@@ -70,7 +70,9 @@ jobs:
 
             echo "::group::${repo_full} (${image})"
             workdir="$(mktemp -d)"
+            echo "trying repo clone"
             gh repo clone "${repo_full}" "$workdir/repo" -- -q
+            echo "completed repo clone"
             cd "$workdir/repo"
 
             # discover default base branch
