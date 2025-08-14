@@ -1,15 +1,15 @@
 base-ubuntu:
 - web-apache:
-  - SecurityUniversal/platform-container-base-images
+  - SecurityUniversalOrg/platform-container-base-images
 - lang-python:
-  - SecurityUniversal/platform-container-base-images
+  - SecurityUniversalOrg/platform-container-base-images
 - lang-node:
-  - SecurityUniversal/platform-container-base-images
+  - SecurityUniversalOrg/platform-container-base-images
 base-ubuntu-slim: []
 base-ubi9-fips: []
 web-apache:
 - web-flask:
-  - SecurityUniversal/platform-container-base-images
+  - SecurityUniversalOrg/platform-container-base-images
 web-flask: []
 lang-python: []
 lang-java: []
