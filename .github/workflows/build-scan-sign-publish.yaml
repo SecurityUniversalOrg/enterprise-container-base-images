@@ -221,7 +221,7 @@ jobs:
       - name: Notify dependent layers
         id: notify-dependents
         env:
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}   # PAT or GitHub App token scoped to the *updater repo*
+          TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}   # PAT or GitHub App token scoped to the *updater repo*
           REPO:  ${{ github.repository }}          # target repo (Workflow B lives here)
           SUBSET_JSON: ${{ steps.determine-dependents.outputs.subset }}
         shell: bash
