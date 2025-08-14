@@ -215,7 +215,7 @@ jobs:
             # Get all tags, exclude cosign artifacts, sort, and take the latest
             old_tag=$(skopeo list-tags "docker://${IMAGE_NAME}" \
             | jq -r '.Tags[]' \
-            | grep -Ev '(^sha256-|\.sig$|\.att$|\.sbom$)' \
+            | grep -E '^[0-9]{2}\.[0-9]{2}-[0-9]{4}\.[0-9]{2}(\.P[0-9]+)?$' \
             | sort -V \
             | tail -n 1)
 
