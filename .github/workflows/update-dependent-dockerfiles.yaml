@@ -75,7 +75,7 @@ jobs:
             cd "$workdir/repo"
 
             echo "Debugging Clone Repo Directory"
-            la -lah "$workdir/repo"
+            ls -lah "$workdir/repo"
 
             # discover default base branch
             BASE_BRANCH="$(git remote show origin | awk '/HEAD branch/ {print $NF}')"
