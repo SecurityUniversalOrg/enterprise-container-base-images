@@ -60,6 +60,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "${GH_TOKEN}" | gh auth login --with-token
+          # Configure git to use gh as credential helper (so git clone/push over https works)
+          gh auth setup-git
+          gh auth status
           # subset is like ["web-apache:SecurityUniversalOrg/platform-container-base-images", "lang-python:Org/repo", ...]
           mapfile -t TARGETS < <(jq -r '.[]' <<< '${{ steps.in.outputs.subset }}')
 
