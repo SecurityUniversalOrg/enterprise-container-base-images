@@ -209,16 +209,18 @@ jobs:
       - name: Get old tag from registry
         id: oldtag
         env:
-          IMAGE_NAME: ${{ github.event.client_payload.dockerhub_namespace }}/${{ matrix.name }}   # adjust as needed
+            IMAGE_NAME: ${{ github.event.client_payload.dockerhub_namespace }}/${{ matrix.name }}   # adjust as needed
         run: |
-          set -euo pipefail
-          # Get all tags, sort by semantic/natural order, take the latest
-          old_tag=$(skopeo list-tags "docker://${IMAGE_NAME}" \
+            set -euo pipefail
+            # Get all tags, exclude cosign artifacts, sort, and take the latest
+            old_tag=$(skopeo list-tags "docker://${IMAGE_NAME}" \
             | jq -r '.Tags[]' \
+            | grep -Ev '(^sha256-|\.sig$|\.att$|\.sbom$)' \
             | sort -V \
             | tail -n 1)
-          echo "Old tag is: $old_tag"
-          echo "old_tag=$old_tag" >> "$GITHUB_OUTPUT"
+
+            echo "Old tag is: $old_tag"
+            echo "old_tag=$old_tag" >> "$GITHUB_OUTPUT"
 
       - name: Determine dependent layers
         id: determine-dependents
