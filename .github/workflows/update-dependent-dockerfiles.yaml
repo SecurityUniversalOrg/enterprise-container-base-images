@@ -64,6 +64,7 @@ jobs:
           mapfile -t TARGETS < <(jq -r '.[]' <<< '${{ steps.in.outputs.subset }}')
 
           for item in "${TARGETS[@]}"; do
+            echo "Processing target: $item"
             image="${item%%:*}"
             repo_full="${item#*:}"
 
