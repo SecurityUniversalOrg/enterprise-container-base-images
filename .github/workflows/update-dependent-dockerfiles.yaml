@@ -12,7 +12,7 @@ permissions:
 
 env:
   # Optional: restrict which senders may trigger this workflow for safety
-  ALLOWED_SENDERS: SecurityUniversalOrg  # comma-separated org(s) or user(s)
+  ALLOWED_SENDERS: SecurityUniversalOrg, bkaiserinfosec  # comma-separated org(s) or user(s)
 
 jobs:
   update:
