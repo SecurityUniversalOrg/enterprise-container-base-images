@@ -78,7 +78,7 @@ jobs:
             ls -lah "$workdir/repo"
 
             # discover default base branch
-            BASE_BRANCH="$(git remote show origin | awk '/HEAD branch/ {print $NF}')"
+            BASE_BRANCH="$(gh repo view "${repo_full}" --json defaultBranchRef -q .defaultBranchRef.name || true)"
             [ -n "$BASE_BRANCH" ] || BASE_BRANCH="main"
             BRANCH="chore/bump-${image}-${BASE_NAME}-${NEW_TAG}"
             echo "Base branch: $BASE_BRANCH, New branch: $BRANCH"
