@@ -361,7 +361,7 @@ jobs:
 
       - name: Commit & open PR (one PR for all)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}
         run: |
           set -euo pipefail
           BR="chore/matrix-bump-$(date -u +%Y%m%d%H%M%S)"
