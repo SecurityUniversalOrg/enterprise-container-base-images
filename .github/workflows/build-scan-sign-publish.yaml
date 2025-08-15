@@ -110,6 +110,7 @@ jobs:
             IMAGE_NAME: ${{ github.event.client_payload.dockerhub_namespace }}/${{ matrix.name }}   # adjust as needed
         run: |
             set -euo pipefail
+            echo "Image name is: $IMAGE_NAME"
             # Get all tags, exclude cosign artifacts, sort, and take the latest
             old_tag=$(skopeo list-tags "docker://${IMAGE_NAME}" \
             | jq -r '.Tags[]' \
