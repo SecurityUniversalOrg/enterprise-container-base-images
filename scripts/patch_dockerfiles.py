@@ -1,6 +1,7 @@
 # scripts/patch_dockerfiles.py
 import os, re, sys
 
+
 base_name  = os.environ['BASE_NAME']
 old_tag    = os.environ.get('OLD_TAG', '')
 new_tag    = os.environ['NEW_TAG']
@@ -23,7 +24,7 @@ def patch_text(s):
         if m:
             current_tag = m.group('tag')
             # If OLD_TAG provided, only replace when it matches; if not provided, replace any tag
-            if (old_tag and current_tag == old_tag) or (not old_tag and current_tag != new_tag):
+            if current_tag != new_tag:
                 line = f"{m.group('prefix')}{m.group('platform') or ''}{m.group('ref') or ''}" \
                        f"{m.group('name')}:{new_tag}{m.group('suffix')}"
                 changed=True
@@ -38,7 +39,8 @@ def find_files(root):
 
 root = sys.argv[1] if len(sys.argv)>1 else "."
 touched=[]
-for p in list(find_files(root)):
+all_files = list(find_files(root))
+for p in all_files:
     with open(p,'r',encoding='utf-8',errors='ignore') as fh:
         src = fh.read()
     dst, ch = patch_text(src)
