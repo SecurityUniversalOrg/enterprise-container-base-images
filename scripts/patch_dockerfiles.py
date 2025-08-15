@@ -7,6 +7,8 @@ new_tag    = os.environ['NEW_TAG']
 pat = re.compile(
     r'^(?P<prefix>\s*FROM\s+)(?P<ref>\S*/)?(?P<name>%s):(?P<tag>[^\s]+)(?P<suffix>(\s+AS\s+\S+)?\s*)$' % re.escape(base_name)
 )
+print(f"Regex pattern: {pat.pattern}")
+print(f"Environment variables: BASE_NAME={base_name}, OLD_TAG={old_tag}, NEW_TAG={new_tag}")
 def patch_text(s):
     out, changed=[], False
     for line in s.splitlines(keepends=False):
@@ -24,6 +26,7 @@ def find_files(root):
                 yield os.path.join(d,f)
 
 root = sys.argv[1] if len(sys.argv)>1 else "."
+print(f"Searching for Dockerfiles in: {root}")
 touched=[]
 for p in list(find_files(root)):
     with open(p,'r',encoding='utf-8',errors='ignore') as fh: src = fh.read()

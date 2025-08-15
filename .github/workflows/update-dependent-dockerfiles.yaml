@@ -46,11 +46,6 @@ jobs:
           jq -c '.client_payload.subset' <<< '${{ toJson(github.event) }}' > subset.json
           echo "subset=$(cat subset.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Tooling (jq, gh, git)
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y jq
-
       - name: Process each target repo
         env:
           GH_TOKEN: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}  # PAT or GitHub App token with repo contents + PRs on target repos
