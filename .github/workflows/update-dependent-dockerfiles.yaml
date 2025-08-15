@@ -103,12 +103,13 @@ jobs:
 
             git add -A
             git commit -m "chore: bump ${BASE_NAME} ${OLD_TAG} → ${NEW_TAG} (affects ${image})"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${repo_full}.git"
             git push -u origin "$BRANCH"
 
+            # create PR
             title="Bump ${BASE_NAME} to ${NEW_TAG} for ${image}"
             body=$'Automated cascade update.\n\n- Base: '"\`${BASE_NAME}:${OLD_TAG}\` → \`${NEW_TAG}\`"$'\n- Affected image: '"\`${image}\`"$'\n- Registry prefix preserved.\n\n/cc @security-team @platform-team'
 
-            # Avoid duplicate PRs by title
             if gh pr list --search "$title" --state open --json number | jq -e '. | length > 0' >/dev/null; then
               echo "PR exists; not creating"
             else
