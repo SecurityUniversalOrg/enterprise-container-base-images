@@ -146,9 +146,7 @@ jobs:
 
             # One PR per repo
             TITLE="Bump ${BASE_NAME} to ${NEW_TAG}"
-            BODY=$'Automated cascade update.\n\n'\
-              $'- Base: \`'"${BASE_NAME}:${OLD_TAG}"$'\` → \`'"${NEW_TAG}"$'\`\n'\
-              $'- Affected images:\n'
+            BODY=$'Automated cascade update.\n\n' $'- Base: \`'"${BASE_NAME}:${OLD_TAG}"$'\` → \`'"${NEW_TAG}"$'\`\n' $'- Affected images:\n'
             for img in "${IMAGES[@]}"; do BODY+=$"  - \`${img}\`\n"; done
             BODY+=$'\nRegistry prefix preserved.\n\n/cc @security-team @platform-team\n'
 
