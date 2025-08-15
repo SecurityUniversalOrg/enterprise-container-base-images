@@ -104,6 +104,22 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Get old tag from registry
+        id: oldtag
+        env:
+            IMAGE_NAME: ${{ github.event.client_payload.dockerhub_namespace }}/${{ matrix.name }}   # adjust as needed
+        run: |
+            set -euo pipefail
+            # Get all tags, exclude cosign artifacts, sort, and take the latest
+            old_tag=$(skopeo list-tags "docker://${IMAGE_NAME}" \
+            | jq -r '.Tags[]' \
+            | grep -E '^[0-9]{2}\.[0-9]{2}-[0-9]{4}\.[0-9]{2}(\.P[0-9]+)?$' \
+            | sort -V \
+            | tail -n 1)
+
+            echo "Old tag is: $old_tag"
+            echo "old_tag=$old_tag" >> "$GITHUB_OUTPUT"  
+
       - name: Compute NEW_TAG (auto-increment .P<num>)
         id: tagcalc
         env:
@@ -257,21 +273,7 @@ jobs:
             path: out/update-${{ matrix.name }}.json
       
 
-      - name: Get old tag from registry
-        id: oldtag
-        env:
-            IMAGE_NAME: ${{ github.event.client_payload.dockerhub_namespace }}/${{ matrix.name }}   # adjust as needed
-        run: |
-            set -euo pipefail
-            # Get all tags, exclude cosign artifacts, sort, and take the latest
-            old_tag=$(skopeo list-tags "docker://${IMAGE_NAME}" \
-            | jq -r '.Tags[]' \
-            | grep -E '^[0-9]{2}\.[0-9]{2}-[0-9]{4}\.[0-9]{2}(\.P[0-9]+)?$' \
-            | sort -V \
-            | tail -n 1)
-
-            echo "Old tag is: $old_tag"
-            echo "old_tag=$old_tag" >> "$GITHUB_OUTPUT"
+      
 
       - name: Determine dependent layers
         id: determine-dependents
