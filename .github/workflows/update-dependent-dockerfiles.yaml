@@ -46,9 +46,9 @@ jobs:
           jq -c '.client_payload.subset' <<< '${{ toJson(github.event) }}' > subset.json
           echo "subset=$(cat subset.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Process each target repo
+      - name: Process each target repo (one PR per repo)
         env:
-          GH_TOKEN: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}  # PAT or GitHub App token with repo contents + PRs on target repos
+          GH_TOKEN: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}  # PAT or App token with contents+PRs
           BASE_NAME: ${{ steps.in.outputs.base_name }}
           OLD_TAG:   ${{ steps.in.outputs.old_tag }}
           NEW_TAG:   ${{ steps.in.outputs.new_tag }}
@@ -56,64 +56,109 @@ jobs:
         run: |
           set -euo pipefail
 
-          # subset is like ["web-apache:SecurityUniversalOrg/platform-container-base-images", "lang-python:Org/repo", ...]
+          # TARGETS is like:
+          # ["web-apache:SecurityUniversalOrg/platform-container-base-images",
+          #  "lang-python:SecurityUniversalOrg/platform-container-base-images",
+          #  "lang-node:SecurityUniversalOrg/platform-container-base-images"]
           mapfile -t TARGETS < <(jq -r '.[]' <<< '${{ steps.in.outputs.subset }}')
 
+          # Group by repo -> images
+          tmpdir="$(mktemp -d)"
           for item in "${TARGETS[@]}"; do
-            echo "Processing target: $item"
             image="${item%%:*}"
             repo_full="${item#*:}"
+            safe="${repo_full//\//__}"
+            echo "$image" >> "$tmpdir/${safe}.images"
+          done
 
-            echo "::group::${repo_full} (${image})"
+          # Iterate per repo and create a single PR per repo
+          for f in "$tmpdir"/*.images; do
+            [ -e "$f" ] || { echo "No targets to process."; exit 0; }
+            safe_repo="${f##*/}"
+            safe_repo="${safe_repo%.images}"
+            repo_full="${safe_repo//__/\/}"
+
+            echo "::group::${repo_full}"
+
+            # Unique image list (for PR body visibility only; patcher updates all Dockerfiles referencing the base)
+            mapfile -t IMAGES < <(sort -u "$f")
+            echo "Images in this repo to be affected:"
+            printf ' - %s\n' "${IMAGES[@]}"
+
             workdir="$(mktemp -d)"
             gh repo clone "${repo_full}" "$workdir/repo" -- -q
             cd "$workdir/repo"
 
-            echo "Debugging Clone Repo Directory"
-            ls -lah "$workdir/repo"
+            echo "Repository contents:"
+            ls -lah
 
-            # discover default base branch
+            # Discover default branch (fallback to main)
             BASE_BRANCH="$(gh repo view "${repo_full}" --json defaultBranchRef -q .defaultBranchRef.name || true)"
             [ -n "$BASE_BRANCH" ] || BASE_BRANCH="main"
-            BRANCH="chore/bump-${image}-${BASE_NAME}-${NEW_TAG}"
-            echo "Base branch: $BASE_BRANCH, New branch: $BRANCH"
 
-            git config user.name  "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git checkout -b "$BRANCH"
-            echo "Checking out branch: $BRANCH"
+            BRANCH="chore/bump-${BASE_NAME}-${NEW_TAG}"
 
+            # Reuse branch if it already exists (append changes), otherwise create
+            if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+              git fetch origin "$BRANCH" --quiet
+              git checkout "$BRANCH"
+              git merge --no-edit "origin/$BRANCH" || true
+            else
+              git checkout -b "$BRANCH"
+            fi
+
+            # Patch all Dockerfiles in the repo that reference the base
+            # (script replaces FROM ... <BASE_NAME>:<OLD_TAG> with :<NEW_TAG>, preserving registry & AS)
+            export BASE_NAME OLD_TAG NEW_TAG
             set +e
             python3 scripts/patch_dockerfiles.py .
             status=$?
             set -e
+
             if [ $status -eq 10 ]; then
-              echo "No changes needed; skipping."
+              echo "No changes made by patcher in ${repo_full}; skipping."
               echo "::endgroup::"
+              cd -
               continue
             elif [ $status -ne 0 ]; then
-              echo "Patcher error (${status})"; exit $status
+              echo "Patcher error (${status})"
+              exit $status
             fi
 
             if git diff --quiet; then
-              echo "No diff after patch; skip."
+              echo "No diff after patch in ${repo_full}; skipping."
               echo "::endgroup::"
+              cd -
               continue
             fi
 
+            # Commit all changes together
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -A
-            git commit -m "chore: bump ${BASE_NAME} ${OLD_TAG} → ${NEW_TAG} (affects ${image})"
+            COMMIT_MSG=$'chore: bump '"${BASE_NAME}"$' '"${OLD_TAG}"$' \xe2\x86\x92 '"${NEW_TAG}"$'\n\nAffected images:\n'
+            for img in "${IMAGES[@]}"; do COMMIT_MSG+=$"- ${img}\n"; done
+            git commit -m "$COMMIT_MSG"
+
+            # Authenticated push (avoid credential prompt)
             git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${repo_full}.git"
             git push -u origin "$BRANCH"
 
-            # create PR
-            title="Bump ${BASE_NAME} to ${NEW_TAG} for ${image}"
-            body=$'Automated cascade update.\n\n- Base: '"\`${BASE_NAME}:${OLD_TAG}\` → \`${NEW_TAG}\`"$'\n- Affected image: '"\`${image}\`"$'\n- Registry prefix preserved.\n\n/cc @security-team @platform-team'
+            # One PR per repo
+            TITLE="Bump ${BASE_NAME} to ${NEW_TAG}"
+            BODY=$'Automated cascade update.\n\n'\
+              $'- Base: \`'"${BASE_NAME}:${OLD_TAG}"$'\` → \`'"${NEW_TAG}"$'\`\n'\
+              $'- Affected images:\n'
+            for img in "${IMAGES[@]}"; do BODY+=$"  - \`${img}\`\n"; done
+            BODY+=$'\nRegistry prefix preserved.\n\n/cc @security-team @platform-team\n'
 
-            if gh pr list --search "$title" --state open --json number | jq -e '. | length > 0' >/dev/null; then
-              echo "PR exists; not creating"
+            # Avoid duplicate PRs with same head
+            if gh pr view "$BRANCH" >/dev/null 2>&1; then
+              echo "PR for branch $BRANCH already exists; not creating a new one."
             else
-              gh pr create --title "$title" --body "$body" --base "$BASE_BRANCH" --head "$BRANCH"
+              gh pr create --title "$TITLE" --body "$BODY" --base "$BASE_BRANCH" --head "$BRANCH"
             fi
+
             echo "::endgroup::"
+            cd -
           done
