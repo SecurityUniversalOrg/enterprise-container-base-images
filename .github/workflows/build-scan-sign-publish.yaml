@@ -242,6 +242,21 @@ jobs:
           name: sbom-${{ matrix.name }}
           path: sbom.spdx.json
 
+      - name: Emit update record
+        if: ${{ success() }}
+        run: |
+            set -euo pipefail
+            mkdir -p out
+            echo "{\"name\":\"${{ matrix.name }}\",\"new_tag\":\"${{ steps.tagcalc.outputs.new_tag }}\"}" \
+            > "out/update-${{ matrix.name }}.json"
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ success() }}
+        with:
+            name: updates-${{ matrix.name }}
+            path: out/update-${{ matrix.name }}.json
+      
+
       - name: Get old tag from registry
         id: oldtag
         env:
@@ -297,74 +312,57 @@ jobs:
 
   update-matrix:
     needs: build
-    if: ${{ always() && needs.build.result == 'success' }}   # only if build was successful
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: { fetch-depth: 0 }
 
-      - name: Update matrix.yaml with new tag
-        id: bump
-        env:
-          IMG_NAME: ${{ matrix.name }}
-          NEW_TAG:  ${{ needs.build.outputs.image_tags && fromJson(format('["{0}"]', needs.build.outputs.image_tags))[0] || steps.tagcalc.outputs.new_tag }}
-          # Prefer the computed new_tag; fallback shown for safety
-          COMPUTED_NEW_TAG: ${{ needs.build.outputs.image_tags }}
+      - name: Download all update artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: updates-*
+          merge-multiple: true
+          path: updates
+
+      - name: Apply all updates to matrix.yaml
         run: |
           set -euo pipefail
-          # Prefer the tag from tagcalc (job boundary means we re-derive from needs if necessary)
-          NEW_TAG="${{ needs.build.outputs.old_tag }}"  # dummy read to satisfy parser; we set real NEW_TAG below
-          NEW_TAG="${{ steps.tagcalc.outputs.new_tag || '' }}"
-          if [ -z "$NEW_TAG" ]; then
-            # fallback: first of image_tags output if you exported it, else fail
-            NEW_TAG="${{ steps.build.outputs.image_ref }}" 
-            NEW_TAG="${NEW_TAG##*:}"
-          fi
-          echo "Will set tags[0] for ${IMG_NAME} to ${NEW_TAG}"
-
-          # Update tags[0] for the matching image; keep tags[1] (e.g., latest) unchanged.
-          yq -i '
-            (.images[] | select(.name == env(IMG_NAME)) .tags[0]) = env(NEW_TAG)
-          ' matrix.yaml
-
-          # Optional: also ensure date_tag aligns with the period we built against
-          if [ -n "${{ steps.tagcalc.outputs.period }}" ]; then
+          shopt -s nullglob
+          for f in updates/update-*.json; do
+            name=$(jq -r .name < "$f")
+            tag=$(jq -r .new_tag < "$f")
+            echo "Updating $name -> $tag"
             yq -i '
-              (.images[] | select(.name == env(IMG_NAME)) .date_tag) = "${{ steps.tagcalc.outputs.period }}"
+              (.images[] | select(.name == env(name)) .tags[0]) = env(tag)
             ' matrix.yaml
-          fi
+          done
+          echo "Preview changes:"; git diff -- matrix.yaml || true
 
-          echo "Changed matrix.yaml:"
-          git diff -- matrix.yaml || true
-
-      - name: Commit and PR
+      - name: Commit & open PR (one PR for all)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          IMG_NAME: ${{ matrix.name }}
-          NEW_TAG:  ${{ steps.tagcalc.outputs.new_tag }}
         run: |
           set -euo pipefail
-          BR="chore/matrix-${IMG_NAME}-${NEW_TAG}"
+          BR="chore/matrix-bump-$(date -u +%Y%m%d%H%M%S)"
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BR"
           git add matrix.yaml
-          git commit -m "chore(matrix): set ${IMG_NAME} primary tag to ${NEW_TAG}"
+          if git diff --cached --quiet; then
+            echo "No matrix changes; skipping PR."
+            exit 0
+          fi
+          git commit -m "chore(matrix): bump primary tags after successful builds"
           git push -u origin "$BR"
-
-          # Determine base branch
           BASE_BRANCH="$(git remote show origin | awk '/HEAD branch/ {print $NF}')"
           [ -n "$BASE_BRANCH" ] || BASE_BRANCH="main"
-
           gh pr create \
-            --title "Update matrix: ${IMG_NAME} → ${NEW_TAG}" \
-            --body  "Automated bump of matrix.yaml primary tag for \`${IMG_NAME}\` to \`${NEW_TAG}\` after successful build." \
-            --base "$BASE_BRANCH" \
-            --head "$BR"
+            --title "Update matrix: bump primary tags" \
+            --body  "Automated bump of primary tags for images built successfully." \
+            --base "$BASE_BRANCH" --head "$BR"
 
 
   summarize:
