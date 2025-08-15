@@ -104,6 +104,42 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Compute NEW_TAG (auto-increment .P<num>)
+        id: tagcalc
+        env:
+          IMAGE_REPO: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}
+          # matrix.tags[0] should be your monthly pattern like 24.04-2025.08 (no .P yet) or with .P — both are fine
+          CANDIDATE_TAG: ${{ matrix.tags[0] }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cand="$CANDIDATE_TAG"
+
+          # Extract base prefix (e.g., "24.04") and period (e.g., "2025.08") from CANDIDATE_TAG
+          base="$(sed -E 's/-[0-9]{4}\.[0-9]{2}(\.P[0-9]+)?$//' <<< "$cand")"
+          period="$(sed -E 's/^.*-([0-9]{4}\.[0-9]{2})(\.P[0-9]+)?$/\1/' <<< "$cand")"
+          prefix="${base}-${period}"
+
+          # Find latest matching tag in the registry for this base+period, exclude cosign attachments
+          latest="$(skopeo list-tags "docker://${IMAGE_REPO}" \
+            | jq -r '.Tags[]' \
+            | grep -E "^${prefix}(\.P[0-9]+)?$" \
+            | grep -Ev '(^sha256-|\.sig$|\.att$|\.sbom$)' \
+            | sort -V | tail -n 1 || true)"
+
+          if [[ "$latest" =~ \.P([0-9]+)$ ]]; then
+            next=$(( ${BASH_REMATCH[1]} + 1 ))
+          else
+            next=1
+          fi
+
+          NEW_TAG="${prefix}.P${next}"
+          echo "NEW_TAG=${NEW_TAG}"
+          echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "base_prefix=${prefix}" >> "$GITHUB_OUTPUT"
+          echo "period=${period}" >> "$GITHUB_OUTPUT"  
+
       - name: Build to local daemon (single-arch)
         id: build
         run: |
@@ -111,7 +147,7 @@ jobs:
 
           REPO="${{ needs.prepare.outputs.repo }}"
           NAME="${{ matrix.name }}"
-          TAG_PRIMARY="${{ matrix.tags[0] }}"
+          TAG_PRIMARY="${{ steps.tagcalc.outputs.new_tag }}"
           TAG_SECONDARY="${{ matrix.tags[1] }}"
 
           # Build (single-arch, loaded into local daemon)
@@ -136,7 +172,7 @@ jobs:
       - name: Trivy vulnerability scanner CVE gate
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: '${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}'
+          image-ref: '${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
@@ -155,14 +191,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker push "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}"
+          docker push "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}"
           docker push "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}"
 
       - name: Resolve digest for primary tag
         id: digest
         shell: bash
         env:
-          REF: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[0] }}
+          REF: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}
         run: |
           set -euo pipefail
           # Use skopeo to read the pushed tag’s manifest digest from the registry
@@ -249,7 +285,7 @@ jobs:
             --arg event "update-dependent-dockerfiles" \
             --arg base  "${{ matrix.name }}" \
             --arg old   "${{ steps.oldtag.outputs.old_tag}}" \
-            --arg new   "${{ matrix.tags[0] }}" \
+            --arg new   "${{ steps.tagcalc.outputs.new_tag }}" \
             --arg reg   "${{ github.event.client_payload.dockerhub_namespace }}" \
             --argjson subset "${SUBSET_JSON}" \
             '{event_type:$event, client_payload:{base_name:$base, old_tag:$old, new_tag:$new, reg_prefix:$reg, subset:$subset}}')
@@ -258,6 +294,78 @@ jobs:
             -H "Authorization: Bearer ${TOKEN}" \
             https://api.github.com/repos/${REPO}/dispatches \
             -d "${BODY}"
+
+  update-matrix:
+    needs: build
+    if: ${{ always() && needs.build.result == 'success' }}   # only if build was successful
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update matrix.yaml with new tag
+        id: bump
+        env:
+          IMG_NAME: ${{ matrix.name }}
+          NEW_TAG:  ${{ needs.build.outputs.image_tags && fromJson(format('["{0}"]', needs.build.outputs.image_tags))[0] || steps.tagcalc.outputs.new_tag }}
+          # Prefer the computed new_tag; fallback shown for safety
+          COMPUTED_NEW_TAG: ${{ needs.build.outputs.image_tags }}
+        run: |
+          set -euo pipefail
+          # Prefer the tag from tagcalc (job boundary means we re-derive from needs if necessary)
+          NEW_TAG="${{ needs.build.outputs.old_tag }}"  # dummy read to satisfy parser; we set real NEW_TAG below
+          NEW_TAG="${{ steps.tagcalc.outputs.new_tag || '' }}"
+          if [ -z "$NEW_TAG" ]; then
+            # fallback: first of image_tags output if you exported it, else fail
+            NEW_TAG="${{ steps.build.outputs.image_ref }}" 
+            NEW_TAG="${NEW_TAG##*:}"
+          fi
+          echo "Will set tags[0] for ${IMG_NAME} to ${NEW_TAG}"
+
+          # Update tags[0] for the matching image; keep tags[1] (e.g., latest) unchanged.
+          yq -i '
+            (.images[] | select(.name == env(IMG_NAME)) .tags[0]) = env(NEW_TAG)
+          ' matrix.yaml
+
+          # Optional: also ensure date_tag aligns with the period we built against
+          if [ -n "${{ steps.tagcalc.outputs.period }}" ]; then
+            yq -i '
+              (.images[] | select(.name == env(IMG_NAME)) .date_tag) = "${{ steps.tagcalc.outputs.period }}"
+            ' matrix.yaml
+          fi
+
+          echo "Changed matrix.yaml:"
+          git diff -- matrix.yaml || true
+
+      - name: Commit and PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMG_NAME: ${{ matrix.name }}
+          NEW_TAG:  ${{ steps.tagcalc.outputs.new_tag }}
+        run: |
+          set -euo pipefail
+          BR="chore/matrix-${IMG_NAME}-${NEW_TAG}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BR"
+          git add matrix.yaml
+          git commit -m "chore(matrix): set ${IMG_NAME} primary tag to ${NEW_TAG}"
+          git push -u origin "$BR"
+
+          # Determine base branch
+          BASE_BRANCH="$(git remote show origin | awk '/HEAD branch/ {print $NF}')"
+          [ -n "$BASE_BRANCH" ] || BASE_BRANCH="main"
+
+          gh pr create \
+            --title "Update matrix: ${IMG_NAME} → ${NEW_TAG}" \
+            --body  "Automated bump of matrix.yaml primary tag for \`${IMG_NAME}\` to \`${NEW_TAG}\` after successful build." \
+            --base "$BASE_BRANCH" \
+            --head "$BR"
+
 
   summarize:
     needs: [prepare, build]
