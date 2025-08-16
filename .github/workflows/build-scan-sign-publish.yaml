@@ -166,12 +166,18 @@ jobs:
         with:
           primary_ref: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}
 
+      # - name: Sign image (keyless, by digest)
+      #   env:
+      #     COSIGN_EXPERIMENTAL: "true"
+      #   run: |
+      #     set -euo pipefail
+      #     cosign sign "${{ steps.digest.outputs.full_ref }}"
+
       - name: Sign image (keyless, by digest)
-        env:
-          COSIGN_EXPERIMENTAL: "true"
-        run: |
-          set -euo pipefail
-          cosign sign "${{ steps.digest.outputs.full_ref }}"
+        id: sign-image
+        uses: SecurityUniversalOrg/platform-actions/actions/docker-sign-image@v1
+        with:
+          primary_ref: ${{ steps.digest.outputs.full_ref }}
 
       - name: Generate SBOM (SPDX JSON)
         run: |
