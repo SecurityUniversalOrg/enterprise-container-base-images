@@ -1,4 +1,4 @@
-FROM docker.io/securityuniversal/web-apache:apache-2.4-2025.08.P2
+FROM docker.io/securityuniversal/web-apache:apache-2.4-2025.08.P3
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
