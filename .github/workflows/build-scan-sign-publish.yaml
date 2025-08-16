@@ -98,11 +98,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      # - name: Set up QEMU
+      #   uses: docker/setup-qemu-action@v3
 
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
+      # - name: Set up Buildx
+      #   uses: docker/setup-buildx-action@v3
 
       # - name: Get old tag from registry (tolerate empty/new repos)
       #   id: oldtag
@@ -196,34 +196,44 @@ jobs:
           image_repo: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}
           candidate_tag: ${{ matrix.tags[0] }}
 
+      # - name: Build to local daemon (single-arch)
+      #   id: build
+      #   run: |
+      #     set -euo pipefail
+
+      #     REPO="${{ needs.prepare.outputs.repo }}"
+      #     NAME="${{ matrix.name }}"
+      #     TAG_PRIMARY="${{ steps.tagcalc.outputs.new_tag }}"
+      #     TAG_SECONDARY="${{ matrix.tags[1] }}"
+
+      #     # Build (single-arch, loaded into local daemon)
+      #     docker buildx build \
+      #       --platform linux/amd64 \
+      #       --build-arg DATE_TAG='${{ matrix.date_tag }}' \
+      #       -t "${REPO}/${NAME}:${TAG_PRIMARY}" \
+      #       -t "${REPO}/${NAME}:${TAG_SECONDARY}" \
+      #       --load \
+      #       -f "${{ matrix.path }}/Dockerfile" \
+      #       .
+
+      #     # Compute outputs
+      #     # "image_ref" -> primary tag; "image_name" -> repository/name
+      #     echo "image_ref=${REPO}/${NAME}:${TAG_PRIMARY}" >> "$GITHUB_OUTPUT"
+      #     echo "image_name=${REPO}/${NAME}" >> "$GITHUB_OUTPUT"
+      #     # (optionally expose both tags)
+      #     echo "image_tags=${TAG_PRIMARY},${TAG_SECONDARY}" >> "$GITHUB_OUTPUT"
+      #     SBOM_PATH="${REPO//\//-}-${NAME}"
+      #     echo "sbom_path=${SBOM_PATH}" >> "$GITHUB_OUTPUT"
+
       - name: Build to local daemon (single-arch)
         id: build
-        run: |
-          set -euo pipefail
-
-          REPO="${{ needs.prepare.outputs.repo }}"
-          NAME="${{ matrix.name }}"
-          TAG_PRIMARY="${{ steps.tagcalc.outputs.new_tag }}"
-          TAG_SECONDARY="${{ matrix.tags[1] }}"
-
-          # Build (single-arch, loaded into local daemon)
-          docker buildx build \
-            --platform linux/amd64 \
-            --build-arg DATE_TAG='${{ matrix.date_tag }}' \
-            -t "${REPO}/${NAME}:${TAG_PRIMARY}" \
-            -t "${REPO}/${NAME}:${TAG_SECONDARY}" \
-            --load \
-            -f "${{ matrix.path }}/Dockerfile" \
-            .
-
-          # Compute outputs
-          # "image_ref" -> primary tag; "image_name" -> repository/name
-          echo "image_ref=${REPO}/${NAME}:${TAG_PRIMARY}" >> "$GITHUB_OUTPUT"
-          echo "image_name=${REPO}/${NAME}" >> "$GITHUB_OUTPUT"
-          # (optionally expose both tags)
-          echo "image_tags=${TAG_PRIMARY},${TAG_SECONDARY}" >> "$GITHUB_OUTPUT"
-          SBOM_PATH="${REPO//\//-}-${NAME}"
-          echo "sbom_path=${SBOM_PATH}" >> "$GITHUB_OUTPUT"
+        uses: SecurityUniversalOrg/platform-actions/actions/docker-build-to-daemon@v1
+        with:
+          docker_repo: ${{ needs.prepare.outputs.repo }}
+          image: ${{ matrix.name }}
+          tag_primary: ${{ steps.tagcalc.outputs.new_tag }}
+          tag_secondary: ${{ matrix.tags[1] }}
+          dockerfile_path: ${{ matrix.path }}
 
       - name: Trivy vulnerability scanner CVE gate
         uses: aquasecurity/trivy-action@0.28.0
