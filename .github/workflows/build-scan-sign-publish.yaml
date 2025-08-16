@@ -269,7 +269,6 @@ jobs:
           # Attach it
           COSIGN_EXPERIMENTAL=true cosign attest --type spdx --predicate sbom.spdx.json "${FULL_REF}"
 
-
       - name: Attach SBOM attestation
         env:
           COSIGN_EXPERIMENTAL: "true"
@@ -299,9 +298,6 @@ jobs:
             name: updates-${{ matrix.name }}
             path: out/update-${{ matrix.name }}.json
       
-
-      
-
       - name: Determine dependent layers
         id: determine-dependents
         env:
