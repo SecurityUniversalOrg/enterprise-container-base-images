@@ -48,18 +48,30 @@ jobs:
 
       - name: Process each target repo (one PR per repo)
         env:
-          GH_TOKEN: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}  # PAT or App token with contents+PRs
+          # PAT or GitHub App token with contents:write + pull_requests:write on TARGET repos
+          GH_TOKEN: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}
           BASE_NAME: ${{ steps.in.outputs.base_name }}
           OLD_TAG:   ${{ steps.in.outputs.old_tag }}
           NEW_TAG:   ${{ steps.in.outputs.new_tag }}
+          # make git/gh non-interactive
+          GIT_ASKPASS: /bin/true
+          GIT_TERMINAL_PROMPT: "0"
+          GH_PROMPT_DISABLED: "true"
         shell: bash
         run: |
           set -euo pipefail
 
-          # TARGETS is like:
-          # ["web-apache:SecurityUniversalOrg/platform-container-base-images",
-          #  "lang-python:SecurityUniversalOrg/platform-container-base-images",
-          #  "lang-node:SecurityUniversalOrg/platform-container-base-images"]
+          # ---- PREVENT PROMPTS & AUTHENTICATE GH ----
+          echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
+          gh config set prompt disabled
+          gh config set git_protocol https
+          gh auth setup-git >/dev/null 2>&1 || true
+          gh auth status || { echo "gh not authenticated"; exit 1; }
+
+          # Ensure any plain https github URLs are rewritten to include the token
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+
+          # Parse targets (JSON array of "image:owner/repo")
           mapfile -t TARGETS < <(jq -r '.[]' <<< '${{ steps.in.outputs.subset }}')
 
           # Group by repo -> images
@@ -71,7 +83,6 @@ jobs:
             echo "$image" >> "$tmpdir/${safe}.images"
           done
 
-          # Iterate per repo and create a single PR per repo
           for f in "$tmpdir"/*.images; do
             [ -e "$f" ] || { echo "No targets to process."; exit 0; }
             safe_repo="${f##*/}"
@@ -79,26 +90,20 @@ jobs:
             repo_full="${safe_repo//__/\/}"
 
             echo "::group::${repo_full}"
-
-            # Unique image list (for PR body visibility only; patcher updates all Dockerfiles referencing the base)
             mapfile -t IMAGES < <(sort -u "$f")
-            echo "Images in this repo to be affected:"
-            printf ' - %s\n' "${IMAGES[@]}"
+            printf 'Images in this repo to be affected:\n'; printf ' - %s\n' "${IMAGES[@]}"
 
             workdir="$(mktemp -d)"
-            gh repo clone "${repo_full}" "$workdir/repo" -- -q
-            cd "$workdir/repo"
 
-            echo "Repository contents:"
+            # ---- CLONE USING TOKENED HTTPS (avoids gh clone prompt) ----
+            git clone "https://x-access-token:${GH_TOKEN}@github.com/${repo_full}.git" "$workdir/repo" -q
+            cd "$workdir/repo"
             ls -lah
 
-            # Discover default branch (fallback to main)
             BASE_BRANCH="$(gh repo view "${repo_full}" --json defaultBranchRef -q .defaultBranchRef.name || true)"
             [ -n "$BASE_BRANCH" ] || BASE_BRANCH="main"
 
             BRANCH="chore/bump-${BASE_NAME}-${NEW_TAG}"
-
-            # Reuse branch if it already exists (append changes), otherwise create
             if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
               git fetch origin "$BRANCH" --quiet
               git checkout "$BRANCH"
@@ -107,16 +112,14 @@ jobs:
               git checkout -b "$BRANCH"
             fi
 
-            # Patch all Dockerfiles in the repo that reference the base
-            # (script replaces FROM ... <BASE_NAME>:<OLD_TAG> with :<NEW_TAG>, preserving registry & AS)
             export BASE_NAME OLD_TAG NEW_TAG
             set +e
             python3 scripts/patch_dockerfiles.py .
             status=$?
             set -e
 
-            if [ $status -eq 10 ]; then
-              echo "No changes made by patcher in ${repo_full}; skipping."
+            if [ $status -eq 10 ] || git diff --quiet; then
+              echo "No changes for ${repo_full}; skipping."
               echo "::endgroup::"
               cd -
               continue
@@ -125,43 +128,27 @@ jobs:
               exit $status
             fi
 
-            if git diff --quiet; then
-              echo "No diff after patch in ${repo_full}; skipping."
-              echo "::endgroup::"
-              cd -
-              continue
-            fi
-
-            # Commit all changes together
             git config user.name  "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -A
-            COMMIT_MSG=$'chore: bump '"${BASE_NAME}"$' '"${OLD_TAG}"$' \xe2\x86\x92 '"${NEW_TAG}"$'\n\nAffected images:\n'
+
+            COMMIT_MSG=$'chore: bump '"${BASE_NAME}"$' '"${OLD_TAG:-<none>}"$' \xe2\x86\x92 '"${NEW_TAG}"$'\n\nAffected images:\n'
             for img in "${IMAGES[@]}"; do COMMIT_MSG+=$"- ${img}\n"; done
             git commit -m "$COMMIT_MSG"
 
-            # Authenticated push (avoid credential prompt)
+            # Remote already tokened via clone; ensure again before pushing
             git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${repo_full}.git"
             git push -u origin "$BRANCH"
 
-            # One PR per repo
             TITLE="Bump ${BASE_NAME} to ${NEW_TAG}"
-
-            # Start body with variables embedded
             printf -v BODY $'Automated cascade update.\n\n- Base: `%s:%s` → `%s`\n- Affected images:\n' \
-              "$BASE_NAME" "$OLD_TAG" "$NEW_TAG"
-
-            # Append each affected image as a bullet
-            for img in "${IMAGES[@]}"; do
-              BODY+=$"  - \`${img}\`\n"
-            done
-
-            # Finish the body
+              "$BASE_NAME" "${OLD_TAG:-<none>}" "$NEW_TAG"
+            for img in "${IMAGES[@]}"; do BODY+=$"  - \`${img}\`\n"; done
             BODY+=$'\nRegistry prefix preserved.\n\n/cc @security-team @platform-team\n'
 
             # Avoid duplicate PRs with same head
             if gh pr view "$BRANCH" >/dev/null 2>&1; then
-              echo "PR for branch $BRANCH already exists; not creating a new one."
+              echo "PR for branch $BRANCH already exists."
             else
               gh pr create --title "$TITLE" --body "$BODY" --base "$BASE_BRANCH" --head "$BRANCH"
             fi
