@@ -196,7 +196,6 @@ jobs:
           image_repo: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}
           candidate_tag: ${{ matrix.tags[0] }}
 
-
       - name: Build to local daemon (single-arch)
         id: build
         run: |
