@@ -4,7 +4,7 @@ images:
   - name: base-ubuntu
     path: images/base/ubuntu/24.04
     tags:
-      - 24.04-2025.08.P3
+      - 24.04-2025.08.P4
       - 24.04-latest
   - name: base-ubuntu-slim
     path: images/base/ubuntu/24.04-slim
