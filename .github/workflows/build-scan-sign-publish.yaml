@@ -104,7 +104,7 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Get old tag from registry
+      - name: Get old tag from registry (tolerate empty/new repos)
         id: oldtag
         env:
           IMAGE_NAME: ${{ github.event.client_payload.dockerhub_namespace }}/${{ matrix.name }}
@@ -113,30 +113,39 @@ jobs:
           set -euo pipefail
           echo "Image name is: $IMAGE_NAME"
 
-          # Build the candidate list without failing on an empty grep
+          # Probe tags but don't fail the job if repo is empty / not found yet
+          set +e
           set +o pipefail
-          tags=$(
-            skopeo list-tags "docker://${IMAGE_NAME}" \
-            | jq -r '.Tags[]' \
+          RAW_JSON=$(skopeo list-tags "docker://${IMAGE_NAME}" 2>/dev/null)
+          SKOPEO_STATUS=$?
+          set -o pipefail
+          set -e
+
+          if [ $SKOPEO_STATUS -ne 0 ] || [ -z "${RAW_JSON}" ]; then
+            echo "Repo not found or no tags yet for ${IMAGE_NAME} (first build?)."
+            echo "old_tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Build candidate list; don't fail if grep finds nothing
+          set +o pipefail
+          tags=$(printf '%s' "${RAW_JSON}" \
+            | jq -r '.Tags[]' 2>/dev/null \
             | grep -Ev '(^sha256-|\.sig$|\.att$|\.sbom$)' \
             | grep -E -- '-[0-9]{4}\.[0-9]{2}(\.P[0-9]+)?$' \
-            | sort -V
-          )
+            | sort -V)
           set -o pipefail
 
-          old_tag="$(tail -n 1 <<< "$tags" || true)"
+          old_tag="$(tail -n 1 <<< "${tags:-}" || true)"
 
-          if [[ -z "$old_tag" ]]; then
-            echo "No date-style tag found for ${IMAGE_NAME}."
-            # Optional: fallback to latest semver-ish tag or skip gracefully
-            # old_tag="$(skopeo list-tags "docker://${IMAGE_NAME}" | jq -r '.Tags[]' | sort -V | tail -n1)"
-            # Or:
-            # echo "old_tag=" >> "$GITHUB_OUTPUT"; exit 0
-            exit 1
+          if [ -z "${old_tag:-}" ]; then
+            echo "No date-style tag found for ${IMAGE_NAME} (first build?)."
+            echo "old_tag=" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           echo "Old tag is: $old_tag"
-          echo "old_tag=$old_tag" >> "$GITHUB_OUTPUT" 
+          echo "old_tag=$old_tag" >> "$GITHUB_OUTPUT"
 
       - name: Compute NEW_TAG (auto-increment .P<num>)
         id: tagcalc
