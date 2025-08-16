@@ -29,7 +29,7 @@ images:
   - name: lang-python
     path: images/lang/python/3.12-base
     tags:
-      - py3.12-base-2025.08.P1
+      - py3.12-base-2025.08.P2
       - py3.12-base-latest
   - name: lang-java
     path: images/lang/java/21-jre
