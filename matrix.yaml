@@ -24,7 +24,7 @@ images:
   - name: web-flask
     path: images/web/flask/py3.12
     tags:
-      - flask-py3.12-2025.08
+      - flask-py3.12-2025.08.P1
       - flask-py3.12-latest
   - name: lang-python
     path: images/lang/python/3.12-base
