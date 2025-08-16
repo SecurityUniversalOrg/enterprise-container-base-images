@@ -153,41 +153,49 @@ jobs:
         with:
           image: ${{ github.event.client_payload.dockerhub_namespace }}/${{ matrix.name }}
 
-      - name: Compute NEW_TAG (auto-increment .P<num>)
+      # - name: Compute NEW_TAG (auto-increment .P<num>)
+      #   id: tagcalc
+      #   env:
+      #     IMAGE_REPO: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}
+      #     # matrix.tags[0] should be your monthly pattern like 24.04-2025.08 (no .P yet) or with .P — both are fine
+      #     CANDIDATE_TAG: ${{ matrix.tags[0] }}
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+
+      #     cand="$CANDIDATE_TAG"
+
+      #     # Extract base prefix (e.g., "24.04") and period (e.g., "2025.08") from CANDIDATE_TAG
+      #     base="$(sed -E 's/-[0-9]{4}\.[0-9]{2}(\.P[0-9]+)?$//' <<< "$cand")"
+      #     period="$(sed -E 's/^.*-([0-9]{4}\.[0-9]{2})(\.P[0-9]+)?$/\1/' <<< "$cand")"
+      #     prefix="${base}-${period}"
+
+      #     # Find latest matching tag in the registry for this base+period, exclude cosign attachments
+      #     latest="$(skopeo list-tags "docker://${IMAGE_REPO}" \
+      #       | jq -r '.Tags[]' \
+      #       | grep -E "^${prefix}(\.P[0-9]+)?$" \
+      #       | grep -Ev '(^sha256-|\.sig$|\.att$|\.sbom$)' \
+      #       | sort -V | tail -n 1 || true)"
+
+      #     if [[ "$latest" =~ \.P([0-9]+)$ ]]; then
+      #       next=$(( ${BASH_REMATCH[1]} + 1 ))
+      #     else
+      #       next=1
+      #     fi
+
+      #     NEW_TAG="${prefix}.P${next}"
+      #     echo "NEW_TAG=${NEW_TAG}"
+      #     echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+      #     echo "base_prefix=${prefix}" >> "$GITHUB_OUTPUT"
+      #     echo "period=${period}" >> "$GITHUB_OUTPUT"  
+
+      - name: Compute NEW_TAG
         id: tagcalc
-        env:
-          IMAGE_REPO: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}
-          # matrix.tags[0] should be your monthly pattern like 24.04-2025.08 (no .P yet) or with .P — both are fine
-          CANDIDATE_TAG: ${{ matrix.tags[0] }}
-        shell: bash
-        run: |
-          set -euo pipefail
+        uses: SecurityUniversalOrg/platform-actions/actions/get-new-docker-tag@v1
+        with:
+          image_repo: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}
+          candidate_tag: ${{ matrix.tags[0] }}
 
-          cand="$CANDIDATE_TAG"
-
-          # Extract base prefix (e.g., "24.04") and period (e.g., "2025.08") from CANDIDATE_TAG
-          base="$(sed -E 's/-[0-9]{4}\.[0-9]{2}(\.P[0-9]+)?$//' <<< "$cand")"
-          period="$(sed -E 's/^.*-([0-9]{4}\.[0-9]{2})(\.P[0-9]+)?$/\1/' <<< "$cand")"
-          prefix="${base}-${period}"
-
-          # Find latest matching tag in the registry for this base+period, exclude cosign attachments
-          latest="$(skopeo list-tags "docker://${IMAGE_REPO}" \
-            | jq -r '.Tags[]' \
-            | grep -E "^${prefix}(\.P[0-9]+)?$" \
-            | grep -Ev '(^sha256-|\.sig$|\.att$|\.sbom$)' \
-            | sort -V | tail -n 1 || true)"
-
-          if [[ "$latest" =~ \.P([0-9]+)$ ]]; then
-            next=$(( ${BASH_REMATCH[1]} + 1 ))
-          else
-            next=1
-          fi
-
-          NEW_TAG="${prefix}.P${next}"
-          echo "NEW_TAG=${NEW_TAG}"
-          echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
-          echo "base_prefix=${prefix}" >> "$GITHUB_OUTPUT"
-          echo "period=${period}" >> "$GITHUB_OUTPUT"  
 
       - name: Build to local daemon (single-arch)
         id: build
