@@ -107,7 +107,7 @@ jobs:
       - name: Get old tag from registry
         id: oldtag
         env:
-            IMAGE_NAME: ${{ env.IMAGE_NAME }}   # e.g. docker.io/ns/lang-python
+          IMAGE_NAME: ${{ github.event.client_payload.dockerhub_namespace }}/${{ matrix.name }}
         shell: bash
         run: |
           set -euo pipefail
