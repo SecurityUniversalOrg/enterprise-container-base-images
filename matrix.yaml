@@ -19,7 +19,7 @@ images:
   - name: web-apache
     path: images/web/apache/2.4
     tags:
-      - apache-2.4-2025.08.P2
+      - apache-2.4-2025.08.P3
       - apache-2.4-latest
   - name: web-flask
     path: images/web/flask/py3.12
@@ -29,7 +29,7 @@ images:
   - name: lang-python
     path: images/lang/python/3.12-base
     tags:
-      - py3.12-base-2025.08.P2
+      - py3.12-base-2025.08.P3
       - py3.12-base-latest
   - name: lang-java
     path: images/lang/java/21-jre
