@@ -138,13 +138,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # - name: Promote and push image
+      #   id: promote
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+      #     docker push "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}"
+      #     docker push "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}"
+
       - name: Promote and push image
         id: promote
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker push "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}"
-          docker push "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}"
+        uses: SecurityUniversalOrg/platform-actions/actions/docker-push-image@v1
+        with:
+          primary_ref: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}
+          secondary_ref:  ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}
 
       - name: Resolve digest for primary tag
         id: digest
