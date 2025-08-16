@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   plan:
-    runs-on: ubuntu-latest
+    runs-on: federal
     outputs:
       subset: ${{ steps.compute.outputs.subset }}
     steps:
@@ -52,7 +52,7 @@ jobs:
   rebuild:
     needs: plan
     if: needs.plan.outputs.subset != '[]'
-    runs-on: ubuntu-latest
+    runs-on: federal
     steps:
       - name: Repository dispatch via API
         env:

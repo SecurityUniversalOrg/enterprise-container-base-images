@@ -16,7 +16,7 @@ env:
 
 jobs:
   update:
-    runs-on: ubuntu-latest
+    runs-on: federal
     steps:
       - name: Validate sender
         id: guard
