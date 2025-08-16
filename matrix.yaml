@@ -4,7 +4,7 @@ images:
   - name: base-ubuntu
     path: images/base/ubuntu/24.04
     tags:
-      - 24.04-2025.08.P5
+      - 24.04-2025.08.P6
       - 24.04-latest
   - name: base-ubuntu-slim
     path: images/base/ubuntu/24.04-slim
@@ -24,7 +24,7 @@ images:
   - name: web-flask
     path: images/web/flask/py3.12
     tags:
-      - flask-py3.12-2025.08.P1
+      - flask-py3.12-2025.08.P2
       - flask-py3.12-latest
   - name: lang-python
     path: images/lang/python/3.12-base
