@@ -122,6 +122,7 @@ jobs:
           dockerfile_path: ${{ matrix.path }}
 
       - name: Trivy vulnerability scanner CVE gate
+        id: secscan
         uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: '${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}'
@@ -132,19 +133,12 @@ jobs:
           severity: 'CRITICAL,HIGH'  
 
       - name: Docker Hub login
+        id: docker-login
         uses: docker/login-action@v3
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # - name: Promote and push image
-      #   id: promote
-      #   shell: bash
-      #   run: |
-      #     set -euo pipefail
-      #     docker push "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}"
-      #     docker push "${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}"
 
       - name: Promote and push image
         id: promote
@@ -153,18 +147,24 @@ jobs:
           primary_ref: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}
           secondary_ref:  ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}
 
+      # - name: Resolve digest for primary tag
+      #   id: digest
+      #   shell: bash
+      #   env:
+      #     REF: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}
+      #   run: |
+      #     set -euo pipefail
+      #     # Use skopeo to read the pushed tag’s manifest digest from the registry
+      #     DIGEST=$(skopeo inspect "docker://${REF}" | jq -r .Digest)
+      #     echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+      #     echo "full_ref=${REF%@*}@${DIGEST}" >> "$GITHUB_OUTPUT"
+      #     echo "Resolved: ${REF} -> ${DIGEST}"
+
       - name: Resolve digest for primary tag
         id: digest
-        shell: bash
-        env:
-          REF: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}
-        run: |
-          set -euo pipefail
-          # Use skopeo to read the pushed tag’s manifest digest from the registry
-          DIGEST=$(skopeo inspect "docker://${REF}" | jq -r .Digest)
-          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-          echo "full_ref=${REF%@*}@${DIGEST}" >> "$GITHUB_OUTPUT"
-          echo "Resolved: ${REF} -> ${DIGEST}"
+        uses: SecurityUniversalOrg/platform-actions/actions/find-digest-for-primary-tag@v1
+        with:
+          primary_ref: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}
 
       - name: Sign image (keyless, by digest)
         env:
