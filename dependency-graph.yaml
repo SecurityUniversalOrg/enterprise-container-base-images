@@ -3,8 +3,6 @@ base-ubuntu:
   - SecurityUniversalOrg/platform-container-base-images
 - lang-python:
   - SecurityUniversalOrg/platform-container-base-images
-- lang-node:
-  - SecurityUniversalOrg/platform-container-base-images
 base-ubuntu-slim: []
 base-ubi9-fips: []
 web-apache:
