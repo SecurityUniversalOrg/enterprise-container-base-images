@@ -149,7 +149,7 @@ jobs:
 
       - name: Get old tag
         id: oldtag
-        uses: SecurityUniversalOrg/platform-actions/actions/get-old-tag@main
+        uses: SecurityUniversalOrg/platform-actions/actions/get-old-tag@v1
         with:
           image: docker.io/${{ github.event.client_payload.dockerhub_namespace }}/${{ matrix.name }}
 
