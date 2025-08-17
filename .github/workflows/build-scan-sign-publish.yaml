@@ -165,40 +165,17 @@ jobs:
         with:
           primary_ref: ${{ steps.digest.outputs.full_ref }}
 
-      # - name: Attach SBOM attestation
-      #   env:
-      #     COSIGN_EXPERIMENTAL: "true"
-      #   run: |
-      #     set -euo pipefail
-      #     cosign attest \
-      #       --type spdx \
-      #       --predicate sbom.spdx.json \
-      #       "${{ steps.digest.outputs.full_ref }}"
-
       - name: Attach SBOM attestation
         id: sbom-attach
         uses: SecurityUniversalOrg/platform-actions/actions/docker-attach-sbom@v1
         with:
           primary_ref: ${{ steps.digest.outputs.full_ref }}
+          matrix_name: ${{ matrix.name }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: sbom-${{ matrix.name }}
           path: sbom.spdx.json
-
-      # - name: Emit update record
-      #   if: ${{ success() }}
-      #   run: |
-      #       set -euo pipefail
-      #       mkdir -p out
-      #       echo "{\"name\":\"${{ matrix.name }}\",\"new_tag\":\"${{ steps.tagcalc.outputs.new_tag }}\"}" \
-      #       > "out/update-${{ matrix.name }}.json"
-
-      # - uses: actions/upload-artifact@v4
-      #   if: ${{ success() }}
-      #   with:
-      #       name: updates-${{ matrix.name }}
-      #       path: out/update-${{ matrix.name }}.json
       
       - name: Emit update record
         if: ${{ success() }}
@@ -208,19 +185,25 @@ jobs:
           primary_ref: ${{ steps.tagcalc.outputs.new_tag }}
           matrix_name: ${{ matrix.name }}
 
+      # - name: Determine dependent layers
+      #   id: determine-dependents
+      #   env:
+      #     ROOTS: ${{ matrix.name }}
+      #     FULL_REBUILD: false
+      #     EVENT_NAME: ${{ github.event_name }}
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+      #     echo "Computing cascade subset with roots: '${ROOTS}'"
+      #     python3 -s scripts/find_dependencies.py
+      #     echo "Need to rebuild:"
+      #     grep '^subset=' "$GITHUB_OUTPUT" | sed 's/^subset=//'
+
       - name: Determine dependent layers
         id: determine-dependents
-        env:
-          ROOTS: ${{ matrix.name }}
-          FULL_REBUILD: false
-          EVENT_NAME: ${{ github.event_name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Computing cascade subset with roots: '${ROOTS}'"
-          python3 -s scripts/find_dependencies.py
-          echo "Need to rebuild:"
-          grep '^subset=' "$GITHUB_OUTPUT" | sed 's/^subset=//'
+        uses: SecurityUniversalOrg/platform-actions/actions/docker-find-dependent-layers@v1
+        with:
+          roots: ${{ matrix.name }}
 
       - name: Notify dependent layers
         id: notify-dependents
