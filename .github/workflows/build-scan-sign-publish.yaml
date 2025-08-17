@@ -197,15 +197,21 @@ jobs:
         with:
           primary_ref: ${{ steps.digest.outputs.full_ref }}
 
+      # - name: Attach SBOM attestation
+      #   env:
+      #     COSIGN_EXPERIMENTAL: "true"
+      #   run: |
+      #     set -euo pipefail
+      #     cosign attest \
+      #       --type spdx \
+      #       --predicate sbom.spdx.json \
+      #       "${{ steps.digest.outputs.full_ref }}"
+
       - name: Attach SBOM attestation
-        env:
-          COSIGN_EXPERIMENTAL: "true"
-        run: |
-          set -euo pipefail
-          cosign attest \
-            --type spdx \
-            --predicate sbom.spdx.json \
-            "${{ steps.digest.outputs.full_ref }}"
+        id: sbom-attach
+        uses: SecurityUniversalOrg/platform-actions/actions/docker-attach-sbom@v1
+        with:
+          primary_ref: ${{ steps.digest.outputs.full_ref }}
 
       - uses: actions/upload-artifact@v4
         with:
