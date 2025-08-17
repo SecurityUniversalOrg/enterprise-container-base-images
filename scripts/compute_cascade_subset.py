@@ -19,7 +19,6 @@ def changed_roots_from_git():
     roots = set()
     for line in out.splitlines():
         parts = line.strip().split('/')
-        print(f"Debug of parts: {parts}")
         # expects images/<category>/<name>/...
         if len(parts) >= 3 and parts[0] == "images":
             candidate = f"{parts[1]}-{parts[2]}".replace('_', '-')
