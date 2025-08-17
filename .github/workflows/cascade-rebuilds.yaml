@@ -94,7 +94,6 @@ jobs:
         id: repo-dispatch
         uses: SecurityUniversalOrg/platform-actions/actions/docker-repo-dispatch@v1
         with:
-          dispatch_token: ${{ inputs.roots }}
-          subset_json: ${{ inputs.full_rebuild }}
+          dispatch_token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          subset_json: ${{ needs.plan.outputs.subset }}
           repo_ns: "docker.io/securityuniversal"
-          dispatch_repo: "platform-container-base-images"
