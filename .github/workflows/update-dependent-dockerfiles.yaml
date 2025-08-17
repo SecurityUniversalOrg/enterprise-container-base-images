@@ -1,4 +1,4 @@
-# .github/workflows/update-dependent-dockerfiles.yaml
+---
 name: Cascade • Update Dependent Dockerfiles
 
 on:
@@ -18,154 +18,15 @@ jobs:
   update:
     runs-on: federal
     steps:
-      # - name: Validate sender
-      #   id: guard
-      #   shell: bash
-      #   run: |
-      #     set -euo pipefail
-      #     SENDER='${{ github.event.sender.login }}'
-      #     ALLOWED="${ALLOWED_SENDERS:-}"
-      #     if [ -n "$ALLOWED" ]; then
-      #       IFS=',' read -ra ALR <<< "$ALLOWED"
-      #       OK=false
-      #       for a in "${ALR[@]}"; do
-      #         [ "$SENDER" = "$a" ] && OK=true
-      #       done
-      #       $OK || { echo "Unauthorized sender: $SENDER"; exit 1; }
-      #     fi
-
       - name: Validate sender
         id: guard
         uses: SecurityUniversalOrg/platform-actions/actions/gh-validate-repo-dispatch-sender@v1
         with:
           allowed_senders: SecurityUniversalOrg,bkaiserinfosec
 
-      # - name: Extract payload
-      #   id: in
-      #   shell: bash
-      #   run: |
-      #     set -euo pipefail
-      #     echo "base_name=${{ github.event.client_payload.base_name }}" >> "$GITHUB_OUTPUT"
-      #     echo "old_tag=${{ github.event.client_payload.old_tag }}"   >> "$GITHUB_OUTPUT"
-      #     echo "new_tag=${{ github.event.client_payload.new_tag }}"   >> "$GITHUB_OUTPUT"
-      #     echo "reg_prefix=${{ github.event.client_payload.reg_prefix }}" >> "$GITHUB_OUTPUT"
-      #     jq -c '.client_payload.subset' <<< '${{ toJson(github.event) }}' > subset.json
-      #     echo "subset=$(cat subset.json)" >> "$GITHUB_OUTPUT"
-
       - name: Extract payload
         id: in
         uses: SecurityUniversalOrg/platform-actions/actions/gh-extract-repo-dispatch-payload@v1
-
-      # - name: Process each target repo (one PR per repo)
-      #   env:
-      #     # PAT or GitHub App token with contents:write + pull_requests:write on TARGET repos
-      #     GH_TOKEN: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}
-      #     BASE_NAME: ${{ steps.in.outputs.base_name }}
-      #     OLD_TAG:   ${{ steps.in.outputs.old_tag }}
-      #     NEW_TAG:   ${{ steps.in.outputs.new_tag }}
-      #     # make git/gh non-interactive
-      #     GIT_ASKPASS: /bin/true
-      #     GIT_TERMINAL_PROMPT: "0"
-      #     GH_PROMPT_DISABLED: "true"
-      #   shell: bash
-      #   run: |
-      #     set -euo pipefail
-
-      #     # ---- PREVENT PROMPTS & AUTHENTICATE GH ----
-      #     echo "$GH_TOKEN" | gh auth login --with-token >/dev/null 2>&1 || true
-      #     gh config set prompt disabled
-      #     gh config set git_protocol https
-      #     gh auth setup-git >/dev/null 2>&1 || true
-      #     gh auth status || { echo "gh not authenticated"; exit 1; }
-
-      #     # Ensure any plain https github URLs are rewritten to include the token
-      #     git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
-
-      #     # Parse targets (JSON array of "image:owner/repo")
-      #     mapfile -t TARGETS < <(jq -r '.[]' <<< '${{ steps.in.outputs.subset }}')
-
-      #     # Group by repo -> images
-      #     tmpdir="$(mktemp -d)"
-      #     for item in "${TARGETS[@]}"; do
-      #       image="${item%%:*}"
-      #       repo_full="${item#*:}"
-      #       safe="${repo_full//\//__}"
-      #       echo "$image" >> "$tmpdir/${safe}.images"
-      #     done
-
-      #     for f in "$tmpdir"/*.images; do
-      #       [ -e "$f" ] || { echo "No targets to process."; exit 0; }
-      #       safe_repo="${f##*/}"
-      #       safe_repo="${safe_repo%.images}"
-      #       repo_full="${safe_repo//__/\/}"
-
-      #       echo "::group::${repo_full}"
-      #       mapfile -t IMAGES < <(sort -u "$f")
-      #       printf 'Images in this repo to be affected:\n'; printf ' - %s\n' "${IMAGES[@]}"
-
-      #       workdir="$(mktemp -d)"
-
-      #       # ---- CLONE USING TOKENED HTTPS (avoids gh clone prompt) ----
-      #       git clone "https://x-access-token:${GH_TOKEN}@github.com/${repo_full}.git" "$workdir/repo" -q
-      #       cd "$workdir/repo"
-      #       ls -lah
-
-      #       BASE_BRANCH="$(gh repo view "${repo_full}" --json defaultBranchRef -q .defaultBranchRef.name || true)"
-      #       [ -n "$BASE_BRANCH" ] || BASE_BRANCH="main"
-
-      #       BRANCH="chore/bump-${BASE_NAME}-${NEW_TAG}"
-      #       if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-      #         git fetch origin "$BRANCH" --quiet
-      #         git checkout "$BRANCH"
-      #         git merge --no-edit "origin/$BRANCH" || true
-      #       else
-      #         git checkout -b "$BRANCH"
-      #       fi
-
-      #       export BASE_NAME OLD_TAG NEW_TAG
-      #       set +e
-      #       python3 scripts/patch_dockerfiles.py .
-      #       status=$?
-      #       set -e
-
-      #       if [ $status -eq 10 ] || git diff --quiet; then
-      #         echo "No changes for ${repo_full}; skipping."
-      #         echo "::endgroup::"
-      #         cd -
-      #         continue
-      #       elif [ $status -ne 0 ]; then
-      #         echo "Patcher error (${status})"
-      #         exit $status
-      #       fi
-
-      #       git config user.name  "github-actions[bot]"
-      #       git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      #       git add -A
-
-      #       COMMIT_MSG=$'chore: bump '"${BASE_NAME}"$' '"${OLD_TAG:-<none>}"$' \xe2\x86\x92 '"${NEW_TAG}"$'\n\nAffected images:\n'
-      #       for img in "${IMAGES[@]}"; do COMMIT_MSG+=$"- ${img}\n"; done
-      #       git commit -m "$COMMIT_MSG"
-
-      #       # Remote already tokened via clone; ensure again before pushing
-      #       git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${repo_full}.git"
-      #       git push -u origin "$BRANCH"
-
-      #       TITLE="Bump ${BASE_NAME} to ${NEW_TAG}"
-      #       printf -v BODY $'Automated cascade update.\n\n- Base: `%s:%s` → `%s`\n- Affected images:\n' \
-      #         "$BASE_NAME" "${OLD_TAG:-<none>}" "$NEW_TAG"
-      #       for img in "${IMAGES[@]}"; do BODY+=$"  - \`${img}\`\n"; done
-      #       BODY+=$'\nRegistry prefix preserved.\n\n/cc @security-team @platform-team\n'
-
-      #       # Avoid duplicate PRs with same head
-      #       if gh pr view "$BRANCH" >/dev/null 2>&1; then
-      #         echo "PR for branch $BRANCH already exists."
-      #       else
-      #         gh pr create --title "$TITLE" --body "$BODY" --base "$BASE_BRANCH" --head "$BRANCH"
-      #       fi
-
-      #       echo "::endgroup::"
-      #       cd -
-      #     done
 
       - name: Process each target repo (one PR per repo)
         id: process-repos

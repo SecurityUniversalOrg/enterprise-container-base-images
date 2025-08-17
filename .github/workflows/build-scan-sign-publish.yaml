@@ -1,5 +1,5 @@
 ---
-name: Build-Scan-Sign-Publish
+name: Build • Scan • Sign • Publish
 
 on:
   workflow_dispatch:
