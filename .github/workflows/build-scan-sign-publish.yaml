@@ -42,20 +42,26 @@ jobs:
         with:
           fetch-depth: 2   # or 0 for full history
 
+      # - name: Resolve repo prefix
+      #   id: repo
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+      #     if [ -n "${{ inputs.repo }}" ]; then
+      #       echo "repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
+      #     elif [ -n "${{ github.event.client_payload.dockerhub_namespace }}" ]; then
+      #       echo "repo=${{ github.event.client_payload.dockerhub_namespace }}" >> "$GITHUB_OUTPUT"
+      #     else
+      #       python3 ./scripts/resolve_repo_prefix.py >> "$GITHUB_OUTPUT"
+      #     fi
+      #     echo "Repo prefix from GITHUB_OUTPUT:"
+      #     grep '^repo=' "$GITHUB_OUTPUT" | sed 's/^repo=//'
+
       - name: Resolve repo prefix
         id: repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -n "${{ inputs.repo }}" ]; then
-            echo "repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ github.event.client_payload.dockerhub_namespace }}" ]; then
-            echo "repo=${{ github.event.client_payload.dockerhub_namespace }}" >> "$GITHUB_OUTPUT"
-          else
-            python3 ./scripts/resolve_repo_prefix.py >> "$GITHUB_OUTPUT"
-          fi
-          echo "Repo prefix from GITHUB_OUTPUT:"
-          grep '^repo=' "$GITHUB_OUTPUT" | sed 's/^repo=//'
+        uses: SecurityUniversalOrg/platform-actions/actions/docker-resolve-repo-prefix@v1
+        with:
+          repo: ${{ inputs.repo }}
 
       - name: Determine matrix subset
         id: determinesubset
@@ -185,29 +191,6 @@ jobs:
         uses: SecurityUniversalOrg/platform-actions/actions/docker-find-dependent-layers@v1
         with:
           roots: ${{ matrix.name }}
-
-      # - name: Notify dependent layers
-      #   id: notify-dependents
-      #   env:
-      #     TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}   # PAT or GitHub App token scoped to the *updater repo*
-      #     REPO:  ${{ github.repository }}          # target repo (Workflow B lives here)
-      #     SUBSET_JSON: ${{ steps.determine-dependents.outputs.subset }}
-      #   shell: bash
-      #   run: |
-      #     set -euo pipefail
-      #     BODY=$(jq -n \
-      #       --arg event "update-dependent-dockerfiles" \
-      #       --arg base  "${{ matrix.name }}" \
-      #       --arg old   "${{ steps.oldtag.outputs.old_tag}}" \
-      #       --arg new   "${{ steps.tagcalc.outputs.new_tag }}" \
-      #       --arg reg   "${{ github.event.client_payload.dockerhub_namespace }}" \
-      #       --argjson subset "${SUBSET_JSON}" \
-      #       '{event_type:$event, client_payload:{base_name:$base, old_tag:$old, new_tag:$new, reg_prefix:$reg, subset:$subset}}')
-      #     curl -sS -X POST \
-      #       -H "Accept: application/vnd.github+json" \
-      #       -H "Authorization: Bearer ${TOKEN}" \
-      #       https://api.github.com/repos/${REPO}/dispatches \
-      #       -d "${BODY}"
 
       - name: Notify dependent layers
         id: notify-dependents
