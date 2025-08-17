@@ -175,3 +175,4 @@ jobs:
           base_name: ${{ steps.in.outputs.base_name }}
           old_tag: ${{ steps.in.outputs.old_tag }}
           new_tag: ${{ steps.in.outputs.new_tag }}
+          subset: ${{ steps.in.outputs.subset }}
