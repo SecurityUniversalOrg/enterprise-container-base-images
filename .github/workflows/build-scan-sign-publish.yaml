@@ -251,7 +251,7 @@ jobs:
         uses: SecurityUniversalOrg/platform-actions/actions/gh-open-pr@v1
         with:
           gh_token: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}
-          feature_branch: "chore/matrix-bump-$(date -u +%Y%m%d%H%M%S)"
+          feature_branch: "chore/matrix-bump"
           user_name: "github-actions[bot]"
           user_email: "41898282+github-actions[bot]@users.noreply.github.com"
           commit_msg: "chore(matrix): bump primary tags after successful builds"
