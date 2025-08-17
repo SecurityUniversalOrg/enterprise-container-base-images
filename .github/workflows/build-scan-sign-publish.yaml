@@ -172,10 +172,10 @@ jobs:
           primary_ref: ${{ steps.digest.outputs.full_ref }}
           matrix_name: ${{ matrix.name }}
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sbom-${{ matrix.name }}
-          path: sbom.spdx.json
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: sbom-${{ matrix.name }}
+      #     path: sbom.spdx.json
       
       - name: Emit update record
         if: ${{ success() }}
