@@ -10,7 +10,7 @@ on:
       - matrix.yaml
   schedule:
     # - cron: "0 6 1 * *" # monthly, 06:00 UTC on the 1st
-    - cron: 7 18 17 * *
+    - cron: 15 18 17 * *
   workflow_dispatch:
     inputs:
       roots:
