@@ -223,28 +223,41 @@ jobs:
         id: apply-updates
         uses: SecurityUniversalOrg/platform-actions/actions/docker-apply-updates-to-matrix@v1
 
+      # - name: Commit & open PR (one PR for all)
+      #   env:
+      #     GH_TOKEN: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}
+      #   run: |
+      #     set -euo pipefail
+      #     BR="chore/matrix-bump-$(date -u +%Y%m%d%H%M%S)"
+      #     git config user.name  "github-actions[bot]"
+      #     git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      #     git checkout -b "$BR"
+      #     git add matrix.yaml
+      #     if git diff --cached --quiet; then
+      #       echo "No matrix changes; skipping PR."
+      #       exit 0
+      #     fi
+      #     git commit -m "chore(matrix): bump primary tags after successful builds"
+      #     git push -u origin "$BR"
+      #     BASE_BRANCH="$(git remote show origin | awk '/HEAD branch/ {print $NF}')"
+      #     [ -n "$BASE_BRANCH" ] || BASE_BRANCH="main"
+      #     gh pr create \
+      #       --title "Update matrix: bump primary tags" \
+      #       --body  "Automated bump of primary tags for images built successfully." \
+      #       --base "$BASE_BRANCH" --head "$BR"
+      
       - name: Commit & open PR (one PR for all)
-        env:
-          GH_TOKEN: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}
-        run: |
-          set -euo pipefail
-          BR="chore/matrix-bump-$(date -u +%Y%m%d%H%M%S)"
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BR"
-          git add matrix.yaml
-          if git diff --cached --quiet; then
-            echo "No matrix changes; skipping PR."
-            exit 0
-          fi
-          git commit -m "chore(matrix): bump primary tags after successful builds"
-          git push -u origin "$BR"
-          BASE_BRANCH="$(git remote show origin | awk '/HEAD branch/ {print $NF}')"
-          [ -n "$BASE_BRANCH" ] || BASE_BRANCH="main"
-          gh pr create \
-            --title "Update matrix: bump primary tags" \
-            --body  "Automated bump of primary tags for images built successfully." \
-            --base "$BASE_BRANCH" --head "$BR"
+        id: open-pr
+        uses: SecurityUniversalOrg/platform-actions/actions/gh-open-pr@v1
+        with:
+          gh_token: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}
+          feature_branch: "chore/matrix-bump-$(date -u +%Y%m%d%H%M%S)"
+          user_name: "github-actions[bot]"
+          user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          commit_msg: "chore(matrix): bump primary tags after successful builds"
+          pr_title: "Update matrix: bump primary tags"
+          pr_msg: "Automated bump of primary tags for images built successfully."
+
 
 
   summarize:
