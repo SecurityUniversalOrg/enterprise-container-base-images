@@ -35,19 +35,27 @@ jobs:
         with:
           fetch-depth: 2   # or 0 for full history
 
+      # - name: Compute cascade subset
+      #   id: compute
+      #   env:
+      #     ROOTS: ${{ inputs.roots }}
+      #     FULL_REBUILD: ${{ inputs.full_rebuild }}
+      #     EVENT_NAME: ${{ github.event_name }}
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+      #     echo "Computing cascade subset with roots: '${{ inputs.roots }}' and full_rebuild=${{ inputs.full_rebuild }}"
+      #     python3 -s scripts/compute_cascade_subset.py
+      #     echo "Subset from GITHUB_OUTPUT:"
+      #     grep '^subset=' "$GITHUB_OUTPUT" | sed 's/^subset=//'
+      
       - name: Compute cascade subset
         id: compute
-        env:
-          ROOTS: ${{ inputs.roots }}
-          FULL_REBUILD: ${{ inputs.full_rebuild }}
-          EVENT_NAME: ${{ github.event_name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Computing cascade subset with roots: '${{ inputs.roots }}' and full_rebuild=${{ inputs.full_rebuild }}"
-          python3 -s scripts/compute_cascade_subset.py
-          echo "Subset from GITHUB_OUTPUT:"
-          grep '^subset=' "$GITHUB_OUTPUT" | sed 's/^subset=//'
+        uses: SecurityUniversalOrg/platform-actions/actions/docker-compute-cascade-subset@v1
+        with:
+          roots: ${{ inputs.roots }}
+          full_rebuild: ${{ inputs.full_rebuild }}
+
 
   rebuild:
     needs: plan
