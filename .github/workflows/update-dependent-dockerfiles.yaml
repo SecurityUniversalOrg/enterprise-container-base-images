@@ -38,7 +38,7 @@ jobs:
         id: guard
         uses: SecurityUniversalOrg/platform-actions/actions/gh-validate-repo-dispatch-sender@v1
         with:
-          allowed_senders: ${ALLOWED_SENDERS}
+          allowed_senders: SecurityUniversalOrg,bkaiserinfosec
 
       # - name: Extract payload
       #   id: in
