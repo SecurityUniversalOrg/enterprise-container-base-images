@@ -34,20 +34,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2   # or 0 for full history
-
-      # - name: Compute cascade subset
-      #   id: compute
-      #   env:
-      #     ROOTS: ${{ inputs.roots }}
-      #     FULL_REBUILD: ${{ inputs.full_rebuild }}
-      #     EVENT_NAME: ${{ github.event_name }}
-      #   shell: bash
-      #   run: |
-      #     set -euo pipefail
-      #     echo "Computing cascade subset with roots: '${{ inputs.roots }}' and full_rebuild=${{ inputs.full_rebuild }}"
-      #     python3 -s scripts/compute_cascade_subset.py
-      #     echo "Subset from GITHUB_OUTPUT:"
-      #     grep '^subset=' "$GITHUB_OUTPUT" | sed 's/^subset=//'
       
       - name: Compute cascade subset
         id: compute
@@ -62,34 +48,6 @@ jobs:
     if: needs.plan.outputs.subset != '[]'
     runs-on: federal
     steps:
-      # - name: Repository dispatch via API
-      #   env:
-      #       DISPATCH_TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}
-      #       # Pass the matrix subset (JSON array string like ["base-ubuntu", ...])
-      #       SUBSET_JSON: ${{ needs.plan.outputs.subset }}
-      #   shell: bash
-      #   run: |
-      #       set -euo pipefail
-
-      #       # Fallback to empty JSON array if unset/empty to satisfy set -u and jq --argjson
-      #       : "${SUBSET_JSON:='[]'}"
-
-      #       # (ubuntu-latest already has jq; install only if missing)
-      #       command -v jq >/dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y jq; }
-
-      #       BODY=$(jq -n \
-      #       --arg event "base-images-updated" \
-      #       --arg ns "docker.io/securityuniversal" \
-      #       --argjson subset "${SUBSET_JSON}" \
-      #       '{event_type:$event, client_payload:{dockerhub_namespace:$ns, subset:$subset}}')
-
-      #       curl -sS -X POST \
-      #       -H "Accept: application/vnd.github+json" \
-      #       -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
-      #       -H "User-Agent: repo-dispatch" \
-      #       https://api.github.com/repos/SecurityUniversalOrg/platform-container-base-images/dispatches \
-      #       -d "${BODY}"
-      
       - name: Repository dispatch via API    
         id: repo-dispatch
         uses: SecurityUniversalOrg/platform-actions/actions/docker-repo-dispatch@v1
