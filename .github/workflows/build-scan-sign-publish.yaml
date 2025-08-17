@@ -48,40 +48,28 @@ jobs:
         with:
           repo: ${{ inputs.repo }}
 
-      # - name: Determine matrix subset
-      #   id: determinesubset
-      #   shell: bash
-      #   run: |
-      #     set -euo pipefail
-      #     if [ -n "${{ inputs.subset }}" ]; then
-      #       echo "subset=${{ inputs.subset }}" >> "$GITHUB_OUTPUT"
-      #     elif [ -n "${{ toJson(github.event.client_payload.subset) }}" ]; then
-      #       # Join the array into a comma-separated string
-      #       echo "subset=${{ join(github.event.client_payload.subset, ',') }}" >> "$GITHUB_OUTPUT"
-      #     else
-      #       echo "No subset provided, using full matrix."
-      #       echo "subset=${{ inputs.subset }}" >> "$GITHUB_OUTPUT"
-      #     fi
-      #     echo "Debug GitHub Event: ${{ toJson(github.event) }}"
-      #     echo "Subset value from GITHUB_OUTPUT:"
-      #     grep '^subset=' "$GITHUB_OUTPUT" | sed 's/^subset=//'
-
       - name: Determine matrix subset
         id: determinesubset
         uses: SecurityUniversalOrg/platform-actions/actions/docker-determine-matrix-subset@v1
         with:
           subset: ${{ inputs.subset }}
 
+      # - name: Build matrix (optionally filter by subset)
+      #   id: matrix
+      #   shell: bash
+      #   env:
+      #     SUBSET: ${{ steps.determinesubset.outputs.subset }}
+      #   run: |
+      #     set -euo pipefail
+      #     python3 ./scripts/build_matrix.py
+      #     echo "Matrix from GITHUB_OUTPUT:"
+      #     grep '^matrix=' "$GITHUB_OUTPUT" | sed 's/^matrix=//'
+
       - name: Build matrix (optionally filter by subset)
         id: matrix
-        shell: bash
-        env:
-          SUBSET: ${{ steps.determinesubset.outputs.subset }}
-        run: |
-          set -euo pipefail
-          python3 ./scripts/build_matrix.py
-          echo "Matrix from GITHUB_OUTPUT:"
-          grep '^matrix=' "$GITHUB_OUTPUT" | sed 's/^matrix=//'
+        uses: SecurityUniversalOrg/platform-actions/actions/docker-create-image-matrix@v1
+        with:
+          subset: ${{ steps.determinesubset.outputs.subset }}
 
   build:
     needs: prepare
