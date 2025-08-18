@@ -104,7 +104,9 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL'  
+          severity: 'CRITICAL'
+        env:
+          TRIVY_TIMEOUT: 15m
 
       - name: Docker Hub login
         id: docker-login
