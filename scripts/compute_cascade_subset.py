@@ -18,6 +18,7 @@ def changed_roots_from_git():
         return set()
     roots = set()
     for line in out.splitlines():
+        print(f"Changed Line: {line}")
         parts = line.strip().split('/')
         # expects images/<category>/<name>/...
         if len(parts) >= 3 and parts[0] == "images":

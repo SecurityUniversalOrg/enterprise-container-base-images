@@ -56,6 +56,50 @@ RUN adduser --disabled-password --gecos "" --uid 1001 runner \
     && echo "%sudo   ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers \
     && echo "Defaults env_keep += \"DEBIAN_FRONTEND\"" >> /etc/sudoers
 
+## Start of Custom Updates
+
+# Install jq - already installed in line 43
+
+# Install yq
+RUN add-apt-repository ppa:rmescandon/yq \
+    && apt update -y \
+    && apt install -y yq
+
+# Install git - already installed in line 49
+
+# Install gh cli
+ARG GH_VERSION="2.76.2"
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends curl ca-certificates gnupg; \
+    rm -rf /var/lib/apt/lists/*; \
+    \
+    # Install GitHub CLI apt repo key (keyring)
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      -o /usr/share/keyrings/githubcli-archive-keyring.gpg; \
+    chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg; \
+    \
+    # Add GitHub CLI apt source (architecture-aware)
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list; \
+    \
+    # Install gh (optionally pinned)
+    apt-get update; \
+    if [ -n "$GH_VERSION" ]; then \
+      apt-get install -y --no-install-recommends "gh=${GH_VERSION}*"; \
+    else \
+      apt-get install -y --no-install-recommends gh; \
+    fi; \
+    \
+    # Cleanup
+    rm -rf /var/lib/apt/lists/*
+
+# Quick self-check (remove if you prefer smaller images)
+RUN gh --version
+
+## End of Custom Updates
+
 WORKDIR /home/runner
 
 COPY --chown=runner:docker --from=build /actions-runner .
