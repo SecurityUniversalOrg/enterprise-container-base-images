@@ -1,4 +1,3 @@
-# Source: https://github.com/dotnet/dotnet-docker
 FROM mcr.microsoft.com/dotnet/runtime-deps:8.0-jammy AS build
 
 ARG TARGETOS=linux
