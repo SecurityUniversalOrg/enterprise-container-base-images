@@ -107,6 +107,7 @@ jobs:
           severity: 'CRITICAL'
         env:
           TRIVY_TIMEOUT: 15m
+          TRIVY_CACHE_DIR: ${{ github.workspace }}/.cache/trivy
 
       - name: Docker Hub login
         id: docker-login
