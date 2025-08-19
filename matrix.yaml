@@ -64,5 +64,5 @@ images:
   - name: base-gh-runner
     path: images/base/gh-runner/2.328.0
     tags:
-      - 2.328.0-2025.08
+      - 2.328.0-2025.08.P1
       - 2.328.0-latest
