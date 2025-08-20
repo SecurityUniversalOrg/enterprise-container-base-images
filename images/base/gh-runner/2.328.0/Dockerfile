@@ -89,6 +89,42 @@ RUN adduser --disabled-password --gecos "" --uid 1001 runner \
 
 COPY --chown=runner:runner --from=build /actions-runner .
 
+## Patch for CVE-2024-21538
+RUN set -eux; \
+  # 1) Locate bundled Node in the GH runner and put it on PATH
+  NODEBIN=""; \
+  for v in 24 22 20 18 16; do \
+    if [ -x "/home/runner/externals/node${v}/bin/node" ]; then \
+      NODEBIN="/home/runner/externals/node${v}/bin"; \
+      break; \
+    fi; \
+  done; \
+  [ -n "$NODEBIN" ] || { echo "No bundled Node found under /home/runner/externals"; exit 1; }; \
+  export PATH="$NODEBIN:$PATH"; \
+  node -v; npm -v || true; \
+  \
+  # 2) Find affected package.json files, but SKIP npm's own vendor tree
+  PKG_LIST="$(grep -rl --include='package.json' -e '"'"'cross-spawn'"'"' /home/runner \
+              | grep -v '/lib/node_modules/npm/' || true)"; \
+  if [ -n "$PKG_LIST" ]; then \
+    echo "$PKG_LIST" | while IFS= read -r pkg; do \
+      echo "Patching $pkg"; \
+      tmp="${pkg}.tmp"; \
+      jq 'if .dependencies and .dependencies["cross-spawn"] then .dependencies["cross-spawn"]="7.0.5" else . end \
+          | if .devDependencies and .devDependencies["cross-spawn"] then .devDependencies["cross-spawn"]="7.0.5" else . end' \
+          "$pkg" > "$tmp"; \
+      mv "$tmp" "$pkg"; \
+      dir="$(dirname "$pkg")"; \
+      rm -f "$dir/package-lock.json"; \
+      # Optional: only for YOUR projects, not npm's vendor tree.
+      # Use --ignore-scripts to avoid prepare/postinstall failures.
+      ( cd "$dir" && npm ci --omit=dev --ignore-scripts ) || true; \
+    done; \
+  else \
+    echo "No affected package.json files found outside npm vendor tree."; \
+  fi
+##
+
 RUN chown runner:runner /home/runner
 
 USER runner
