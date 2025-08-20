@@ -89,30 +89,6 @@ RUN adduser --disabled-password --gecos "" --uid 1001 runner \
 
 COPY --chown=runner:runner --from=build /actions-runner .
 
-## Patch for CVE-2024-21538 by upgrading npm (pulls fixed cross-spawn)
-RUN set -eux; \
-  # locate bundled Node and put it on PATH
-  NODEBIN=""; \
-  for v in 24 22 20 18 16; do \
-    if [ -x "/home/runner/externals/node${v}/bin/node" ]; then NODEBIN="/home/runner/externals/node${v}/bin"; break; fi; \
-  done; \
-  [ -n "$NODEBIN" ] || { echo "No bundled Node found under /home/runner/externals"; exit 1; }; \
-  export PATH="$NODEBIN:$PATH"; \
-  node -v; npm -v || true; \
-  \
-  # upgrade npm globally (no scripts) and force public registry
-  npm config set registry https://registry.npmjs.org/; \
-  npm config set @npmcli:registry https://registry.npmjs.org/; \
-  npm i -g npm@11.5.2 --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/; \
-  \
-  # verify the cross-spawn version that npm now vendors (resolve via npm's global root)
-  node -e 'const {execSync}=require("child_process"); \
-           const p=require("path"); \
-           const root=execSync("npm root -g").toString().trim(); \
-           const cs=p.join(root,"npm","node_modules","cross-spawn","package.json"); \
-           console.log("cross-spawn:", require(cs).version);'
-##
-
 RUN chown runner:runner /home/runner
 
 USER runner
