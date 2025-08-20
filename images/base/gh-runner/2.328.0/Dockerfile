@@ -116,7 +116,7 @@ RUN set -eux; \
   test -f "$NPMDIR/package.json"; \
   tmp="$NPMDIR/package.json.tmp"; \
   jq 'if .dependencies and .dependencies["cross-spawn"] \
-        then .dependencies["cross-spawn"]="7.0.5" else . end
+        then .dependencies["cross-spawn"]="7.0.5" else . end \
       | if .devDependencies and .devDependencies["cross-spawn"] \
         then .devDependencies["cross-spawn"]="7.0.5" else . end' \
       "$NPMDIR/package.json" > "$tmp"; \
