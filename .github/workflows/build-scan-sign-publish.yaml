@@ -104,7 +104,7 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL'
+          severity: 'CRITICAL,HIGH'
         env:
           TRIVY_TIMEOUT: 15m
           TRIVY_CACHE_DIR: ${{ github.workspace }}/.cache/trivy
