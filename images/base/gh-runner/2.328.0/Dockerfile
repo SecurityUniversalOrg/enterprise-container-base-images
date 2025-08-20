@@ -89,43 +89,28 @@ RUN adduser --disabled-password --gecos "" --uid 1001 runner \
 
 COPY --chown=runner:runner --from=build /actions-runner .
 
-## Patch for CVE-2024-21538
+## Patch for CVE-2024-21538 by upgrading npm (pulls fixed cross-spawn)
 RUN set -eux; \
-  # 0) Pick the node the runner actually uses and expose it on PATH
+  # locate bundled Node and put it on PATH
   NODEBIN=""; \
-  for v in 22 20 18 16; do \
-    if [ -x "/home/runner/externals/node${v}/bin/node" ]; then \
-      NODEBIN="/home/runner/externals/node${v}/bin"; \
-      break; \
-    fi; \
+  for v in 24 22 20 18 16; do \
+    if [ -x "/home/runner/externals/node${v}/bin/node" ]; then NODEBIN="/home/runner/externals/node${v}/bin"; break; fi; \
   done; \
   [ -n "$NODEBIN" ] || { echo "No bundled Node found under /home/runner/externals"; exit 1; }; \
   export PATH="$NODEBIN:$PATH"; \
   node -v; npm -v || true; \
   \
-  # 1) (Optional) remove extra Node versions you don't need to shrink scanner surface
-  for v in 24 22 20 18 16; do \
-    if [ "$NODEBIN" != "/home/runner/externals/node${v}/bin" ] && [ -d "/home/runner/externals/node${v}" ]; then \
-      rm -rf "/home/runner/externals/node${v}"; \
-    fi; \
-  done; \
+  # upgrade npm globally (no scripts) and force public registry
+  npm config set registry https://registry.npmjs.org/; \
+  npm config set @npmcli:registry https://registry.npmjs.org/; \
+  npm i -g npm@11.5.2 --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/; \
   \
-  # 2) Patch npm’s dependency to cross-spawn@7.0.5 and reinstall deps without scripts
-  NPMDIR="$(dirname "$(dirname "$(command -v npm)")")/lib/node_modules/npm"; \
-  echo "npm dir = $NPMDIR"; \
-  test -f "$NPMDIR/package.json"; \
-  tmp="$NPMDIR/package.json.tmp"; \
-  jq 'if .dependencies and .dependencies["cross-spawn"] \
-        then .dependencies["cross-spawn"]="7.0.5" else . end \
-      | if .devDependencies and .devDependencies["cross-spawn"] \
-        then .devDependencies["cross-spawn"]="7.0.5" else . end' \
-      "$NPMDIR/package.json" > "$tmp"; \
-  mv "$tmp" "$NPMDIR/package.json"; \
-  rm -f "$NPMDIR/package-lock.json"; \
-  ( cd "$NPMDIR" && npm ci --omit=dev --ignore-scripts ); \
-  \
-  # 3) Verify the effective version that npm will resolve to
-  node -e "console.log(require(require('path').join(process.env.NPMDIR||'$NPMDIR','node_modules','cross-spawn','package.json')).version)"
+  # verify the cross-spawn version that npm now vendors (resolve via npm's global root)
+  node -e 'const {execSync}=require("child_process"); \
+           const p=require("path"); \
+           const root=execSync("npm root -g").toString().trim(); \
+           const cs=p.join(root,"npm","node_modules","cross-spawn","package.json"); \
+           console.log("cross-spawn:", require(cs).version);'
 ##
 
 RUN chown runner:runner /home/runner
