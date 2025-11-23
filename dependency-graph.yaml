@@ -16,3 +16,11 @@ lang-node: []
 lang-dotnet: []
 lang-dotnet-sdk: []
 lang-go: []
+base-gh-runner:
+- ghr-base-aws:
+  - SecurityUniversalOrg/platform-arc-runner-images
+- ghr-base-azure:
+  - SecurityUniversalOrg/platform-arc-runner-images
+- ghr-base-gcp:
+  - SecurityUniversalOrg/platform-arc-runner-images
+
