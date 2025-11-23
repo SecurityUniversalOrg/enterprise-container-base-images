@@ -43,7 +43,7 @@ def find_direct_dependencies(roots, graph):
     return seen
 
 roots_in = (os.getenv('ROOTS') or '')
-roots_in = 'base-ubuntu'
+
 print(f"Roots input: {roots_in}")
 
 roots = {x.strip() for x in roots_in.split(',') if x.strip()}
