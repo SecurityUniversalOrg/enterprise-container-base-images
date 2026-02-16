@@ -104,10 +104,7 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL'
-        env:
-          TRIVY_TIMEOUT: 15m
-          TRIVY_CACHE_DIR: ${{ github.workspace }}/.cache/trivy
+          severity: 'CRITICAL,HIGH'  
 
       - name: Docker Hub login
         id: docker-login
