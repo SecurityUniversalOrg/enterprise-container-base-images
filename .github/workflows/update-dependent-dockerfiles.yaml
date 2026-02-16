@@ -20,17 +20,17 @@ jobs:
     steps:
       - name: Validate sender
         id: guard
-        uses: SecurityUniversalOrg/platform-actions/actions/gh-validate-repo-dispatch-sender@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/gh-validate-repo-dispatch-sender@v1
         with:
           allowed_senders: SecurityUniversalOrg,bkaiserinfosec
 
       - name: Extract payload
         id: in
-        uses: SecurityUniversalOrg/platform-actions/actions/gh-extract-repo-dispatch-payload@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/gh-extract-repo-dispatch-payload@v1
 
       - name: Process each target repo (one PR per repo)
         id: process-repos
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-push-update-dependent-files@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-push-update-dependent-files@v1
         with:
           gh_token: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}
           base_name: ${{ steps.in.outputs.base_name }}

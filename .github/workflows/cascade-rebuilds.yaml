@@ -38,7 +38,7 @@ jobs:
       
       - name: Compute cascade subset
         id: compute
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-compute-cascade-subset@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-compute-cascade-subset@v1
         with:
           roots: ${{ inputs.roots }}
           full_rebuild: ${{ inputs.full_rebuild }}
@@ -51,7 +51,7 @@ jobs:
     steps:
       - name: Repository dispatch via API    
         id: repo-dispatch
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-repo-dispatch@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-repo-dispatch@v1
         with:
           dispatch_token: ${{ secrets.REPO_DISPATCH_TOKEN }}
           subset_json: ${{ needs.plan.outputs.subset }}
