@@ -44,19 +44,19 @@ jobs:
 
       - name: Resolve repo prefix
         id: repo
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-resolve-repo-prefix@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-resolve-repo-prefix@v1
         with:
           repo: ${{ inputs.repo }}
 
       - name: Determine matrix subset
         id: determinesubset
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-determine-matrix-subset@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-determine-matrix-subset@v1
         with:
           subset: ${{ inputs.subset }}
 
       - name: Build matrix (optionally filter by subset)
         id: matrix
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-create-image-matrix@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-create-image-matrix@v1
         with:
           subset: ${{ steps.determinesubset.outputs.subset }}
 
@@ -74,20 +74,20 @@ jobs:
 
       - name: Get old docker tag
         id: oldtag
-        uses: SecurityUniversalOrg/platform-actions/actions/get-old-tag@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/get-old-tag@v1
         with:
           image: ${{ github.event.client_payload.dockerhub_namespace }}/${{ matrix.name }}
 
       - name: Compute new docker tag
         id: tagcalc
-        uses: SecurityUniversalOrg/platform-actions/actions/get-new-docker-tag@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/get-new-docker-tag@v1
         with:
           image_repo: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}
           candidate_tag: ${{ matrix.tags[0] }}
 
       - name: Build to local daemon (single-arch)
         id: build
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-build-to-daemon@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-build-to-daemon@v1
         with:
           docker_repo: ${{ needs.prepare.outputs.repo }}
           image: ${{ matrix.name }}
@@ -104,10 +104,7 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL'
-        env:
-          TRIVY_TIMEOUT: 15m
-          TRIVY_CACHE_DIR: ${{ github.workspace }}/.cache/trivy
+          severity: 'CRITICAL,HIGH'  
 
       - name: Docker Hub login
         id: docker-login
@@ -119,32 +116,32 @@ jobs:
 
       - name: Promote and push image
         id: promote
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-push-image@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-push-image@v1
         with:
           primary_ref: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}
           secondary_ref:  ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ matrix.tags[1] }}
 
       - name: Resolve digest for primary tag
         id: digest
-        uses: SecurityUniversalOrg/platform-actions/actions/find-digest-for-primary-tag@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/find-digest-for-primary-tag@v1
         with:
           primary_ref: ${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}
 
       - name: Sign image (keyless, by digest)
         id: sign-image
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-sign-image@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-sign-image@v1
         with:
           primary_ref: ${{ steps.digest.outputs.full_ref }}
       
       - name: Generate SBOM (SPDX JSON)
         id: sbom
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-generate-sbom@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-generate-sbom@v1
         with:
           primary_ref: ${{ steps.digest.outputs.full_ref }}
 
       - name: Attach SBOM attestation
         id: sbom-attach
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-attach-sbom@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-attach-sbom@v1
         with:
           primary_ref: ${{ steps.digest.outputs.full_ref }}
           matrix_name: ${{ matrix.name }}
@@ -152,20 +149,20 @@ jobs:
       - name: Emit update record
         if: ${{ success() }}
         id: update-emit
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-emit-update-record@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-emit-update-record@v1
         with:
           primary_ref: ${{ steps.tagcalc.outputs.new_tag }}
           matrix_name: ${{ matrix.name }}
 
       - name: Determine dependent layers
         id: determine-dependents
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-find-dependent-layers@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-find-dependent-layers@v1
         with:
           roots: ${{ matrix.name }}
 
       - name: Notify dependent layers
         id: notify-dependents
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-notify-dependent-layers@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-notify-dependent-layers@v1
         with:
           gh_token: ${{ secrets.REPO_DISPATCH_TOKEN }}
           subset_json: ${{ steps.determine-dependents.outputs.subset }}
@@ -224,7 +221,7 @@ jobs:
 
       - name: Apply all updates to matrix.yaml
         id: apply-updates
-        uses: SecurityUniversalOrg/platform-actions/actions/docker-apply-updates-to-matrix@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/docker-apply-updates-to-matrix@v1
 
       # - name: Commit & open PR (one PR for all)
       #   env:
@@ -251,7 +248,7 @@ jobs:
       
       - name: Commit & open PR (one PR for all)
         id: open-pr
-        uses: SecurityUniversalOrg/platform-actions/actions/gh-open-pr@v1
+        uses: SecurityUniversalOrg/ghe-actions/actions/gh-open-pr@v1
         with:
           gh_token: ${{ secrets.DEPENDENT_REPO_RW_TOKEN }}
           feature_branch: "chore/matrix-bump"
