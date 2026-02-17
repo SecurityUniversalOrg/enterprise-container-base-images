@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/dotnet/runtime-deps:8.0-jammy AS build
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 ARG RUNNER_VERSION=2.331.0
-ARG RUNNER_CONTAINER_HOOKS_VERSION=0.8.0
+ARG RUNNER_CONTAINER_HOOKS_VERSION=0.8.1
 
 
 RUN apt update -y && apt install curl unzip -y
@@ -70,7 +70,7 @@ RUN add-apt-repository ppa:rmescandon/yq \
 # Install gh cli
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates gnupg; \
+    apt-get install -y --no-install-recommends ca-certificates=${CA_CERTIFICATES_VERSION} gnupg=${GNUPG_VERSION}; \
     rm -rf /var/lib/apt/lists/*; \
     \
     # Install GitHub CLI apt repo key (keyring)
