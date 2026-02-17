@@ -30,9 +30,9 @@ ARG SUDO_VERSION=1.9.9-1ubuntu2.5
 ARG LSBD_VERSION=11.1.0ubuntu4
 ARG GPG_AGENT_VERSION=2.2.27-3ubuntu2.5
 ARG SOFTWARE_PROPERTIES_COMMON_VERSION=0.99.22.9
-
+ARG CURL_VERSION=7.81.0-1ubuntu1.21
 ARG JQ_VERSION=1.6-2.1ubuntu3.1
-
+ARG UNZIP_VERSION=6.0-26ubuntu3.2
 ARG GIT_VERSION=1:2.53.0-0ppa1~ubuntu22.04.1
 ARG YQ_VERSION=4.16.2
 ARG CA_CERTIFICATES_VERSION=20240203~22.04.1
@@ -46,7 +46,9 @@ RUN apt update -y \
       lsb-release=${LSBD_VERSION} \
       gpg-agent=${GPG_AGENT_VERSION} \
       software-properties-common=${SOFTWARE_PROPERTIES_COMMON_VERSION} \
+      curl=${CURL_VERSION} \
       jq=${JQ_VERSION} \
+      unzip=${UNZIP_VERSION} \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure git-core/ppa based on guidance here:  https://git-scm.com/download/linux
