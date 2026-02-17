@@ -63,7 +63,6 @@ RUN set -eux; \
     echo "Defaults env_keep += \"DEBIAN_FRONTEND\"" >> /etc/sudoers
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -86,7 +85,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       apt-get install -y --no-install-recommends git=${GIT_VERSION}; \
     else \
       apt-get update; \
-      apt-get install -y --no-install-recommends git; \
+      apt-get install -y --no-install-recommends git=${GIT_VERSION}; \
     fi; \
     rm -rf /var/lib/apt/lists/*
 
