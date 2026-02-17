@@ -25,17 +25,35 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV RUNNER_MANUALLY_TRAP_SIG=1
 ENV ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
 ENV ImageOS=ubuntu22
+ARG SUDO_VERSION=1.9.9-1ubuntu2.5
+ARG LSBD_VERSION=11.1.0ubuntu4
+ARG GPG_AGENT_VERSION=2.2.27-3ubuntu2.5
+ARG SOFTWARE_PROPERTIES_COMMON_VERSION=0.99.22.9
+ARG CURL_VERSION=7.81.0-1ubuntu1.21
+ARG JQ_VERSION=1.6-2.1ubuntu3.1
+ARG UNZIP_VERSION=6.0-26ubuntu3.2
+ARG GIT_VERSION=1:2.53.0-0ppa1~ubuntu22.04.1
+ARG YQ_VERSION=4.16.2
+ARG CA_CERTIFICATES_VERSION=20240203~22.04.1
+ARG GNUPG_VERSION=2.2.27-3ubuntu2.5
 ARG GH_VERSION=2.86.0
 
 # 'gpg-agent' and 'software-properties-common' are needed for the 'add-apt-repository' command that follows
 RUN apt update -y \
-    && apt install -y --no-install-recommends sudo lsb-release gpg-agent software-properties-common curl jq unzip \
+    && apt install -y --no-install-recommends \
+      sudo=${SUDO_VERSION} \
+      lsb-release=${LSBD_VERSION} \
+      gpg-agent=${GPG_AGENT_VERSION} \
+      software-properties-common=${SOFTWARE_PROPERTIES_COMMON_VERSION} \
+      curl=${CURL_VERSION} \
+      jq=${JQ_VERSION} \
+      unzip=${UNZIP_VERSION} \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure git-core/ppa based on guidance here:  https://git-scm.com/download/linux
 RUN add-apt-repository ppa:git-core/ppa \
     && apt update -y \
-    && apt install -y git=1:2.53.0-0ppa1~ubuntu22.04.1 \
+    && apt install -y git=${GIT_VERSION} \
     && rm -rf /var/lib/apt/lists/*
 
 ## Start of Custom Updates
@@ -45,14 +63,14 @@ RUN add-apt-repository ppa:git-core/ppa \
 # Install yq
 RUN add-apt-repository ppa:rmescandon/yq \
     && apt update -y \
-    && apt install -y yq
+    && apt install -y yq=${YQ_VERSION}
 
 # Install git - already installed in line 36
 
 # Install gh cli
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends curl ca-certificates gnupg; \
+    apt-get install -y --no-install-recommends ca-certificates gnupg; \
     rm -rf /var/lib/apt/lists/*; \
     \
     # Install GitHub CLI apt repo key (keyring)
@@ -64,7 +82,7 @@ RUN set -eux; \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
       > /etc/apt/sources.list.d/github-cli.list; \
     \
-    # Install gh (optionally pinned)
+    # Install gh
     apt-get update; \
     if [ -n "$GH_VERSION" ]; then \
       apt-get install -y --no-install-recommends "gh=${GH_VERSION}*"; \
