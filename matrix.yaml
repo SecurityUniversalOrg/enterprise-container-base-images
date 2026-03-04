@@ -62,7 +62,7 @@ images:
       - go1.22-2025.08
       - go1.22-latest
   - name: base-gh-runner
-    path: images/base/gh-runner/2.331.0
+    path: images/base/gh-runner/2.332.0
     tags:
-      - 2.331.0-2026.120
-      - 2.331.0-latest
+      - 2.332.0-2026.03
+      - 2.332.0-latest
