@@ -31,7 +31,7 @@ ARG SUDO_VERSION=1.9.9-1ubuntu2.5
 ARG LSBD_VERSION=11.1.0ubuntu4
 ARG GPG_AGENT_VERSION=2.2.27-3ubuntu2.5
 ARG SOFTWARE_PROPERTIES_COMMON_VERSION=0.99.22.9
-ARG CURL_VERSION=7.81.0-1ubuntu1.21
+ARG CURL_VERSION=7.81.0-1ubuntu1.22
 ARG JQ_VERSION=1.6-2.1ubuntu3.1
 ARG UNZIP_VERSION=6.0-26ubuntu3.2
 ARG GIT_VERSION=1:2.53.0-0ppa1~ubuntu22.04.1
@@ -52,49 +52,38 @@ RUN apt update -y \
       unzip=${UNZIP_VERSION} \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure git-core/ppa based on guidance here:  https://git-scm.com/download/linux
-RUN add-apt-repository ppa:git-core/ppa \
-    && apt update -y \
-    && apt install -y git=${GIT_VERSION} \
-    && rm -rf /var/lib/apt/lists/*
-
-## Start of Custom Updates
-
-# Install jq - already installed in line 30
-
-# Install yq
-RUN add-apt-repository ppa:rmescandon/yq \
-    && apt update -y \
-    && apt install -y yq=${YQ_VERSION} \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install git - already installed in line 36
-
-# Install gh cli
-RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates=${CA_CERTIFICATES_VERSION} gnupg=${GNUPG_VERSION}; \
-    rm -rf /var/lib/apt/lists/*; \
-    \
+# ADD ALL NEW REPOSITORIES HERE TO AVOID MULTIPLE APT UPDATE COMMANDS
+RUN add-apt-repository ppa:git-core/ppa; \
+    add-apt-repository ppa:rmescandon/yq; \
     # Install GitHub CLI apt repo key (keyring)
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
       -o /usr/share/keyrings/githubcli-archive-keyring.gpg; \
     chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg; \
-    \
     # Add GitHub CLI apt source (architecture-aware)
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
       > /etc/apt/sources.list.d/github-cli.list; \
     \
+    apt update -y
+
+# Configure git-core/ppa based on guidance here:  https://git-scm.com/download/linux
+RUN apt install -y git=${GIT_VERSION}
+
+# Install yq
+RUN apt install -y yq=${YQ_VERSION}
+
+# Install gh cli
+RUN set -eux; \
+    # Install pre-requisites
+    apt-get install -y --no-install-recommends ca-certificates=${CA_CERTIFICATES_VERSION} gnupg=${GNUPG_VERSION}; \
     # Install gh
-    apt-get update; \
     if [ -n "$GH_VERSION" ]; then \
       apt-get install -y --no-install-recommends "gh=${GH_VERSION}*"; \
     else \
       apt-get install -y --no-install-recommends gh; \
-    fi; \
-    \
-    # Cleanup
-    rm -rf /var/lib/apt/lists/*
+    fi;
+    
+# Cleanup
+RUN rm -rf /var/lib/apt/lists/*
 
 # Quick self-check
 RUN gh --version
