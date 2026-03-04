@@ -97,7 +97,7 @@ jobs:
 
       - name: Trivy vulnerability scanner CVE gate
         id: secscan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           image-ref: '${{ needs.prepare.outputs.repo }}/${{ matrix.name }}:${{ steps.tagcalc.outputs.new_tag }}'
           format: 'table'
